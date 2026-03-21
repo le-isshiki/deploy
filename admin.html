@@ -139,6 +139,13 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 .sp-active{background:rgba(34,197,94,.1);color:var(--ok);border:1px solid rgba(34,197,94,.18)}
 .sp-suspended{background:rgba(240,64,64,.1);color:var(--red);border:1px solid rgba(240,64,64,.18)}
 .sp-pending{background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.18)}
+/* status-dot aliases used in JS */
+.status-dot{display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .65rem;border-radius:99px;font-size:.72rem;font-weight:600}
+.status-dot.done{background:rgba(34,197,94,.1);color:var(--ok);border:1px solid rgba(34,197,94,.18)}
+.status-dot.fail{background:rgba(240,64,64,.1);color:var(--red);border:1px solid rgba(240,64,64,.18)}
+.status-dot.pend{background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.18)}
+.status-dot.blue{background:rgba(59,130,246,.1);color:#93c5fd;border:1px solid rgba(59,130,246,.18)}
+.status-dot.dim{background:rgba(100,100,100,.1);color:var(--muted);border:1px solid rgba(100,100,100,.18)}
 .user-cell{display:flex;align-items:center;gap:.65rem}
 .user-ava{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--teal),#009e8c);display:flex;align-items:center;justify-content:center;color:var(--bg);font-size:.65rem;font-weight:700;flex-shrink:0}
 
