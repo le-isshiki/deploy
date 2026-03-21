@@ -1,0 +1,20 @@
+{
+  "name": "SwitchCash",
+  "short_name": "SwitchCash",
+  "description": "MonCash to NatCash transfers. Flat 5% fee.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0e1512",
+  "theme_color": "#00c9b1",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance"],
+  "lang": "fr-HT"
+}

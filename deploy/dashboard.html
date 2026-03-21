@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dashboard — SwitchCash</title>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#0e1512;--ink2:#152019;--ink3:#1c2b27;--teal:#00c9b1;--teal-dim:#009e8c;--teal-pale:rgba(0,201,177,.08);--teal-pale2:rgba(0,201,177,.14);--teal-glow:rgba(0,201,177,.22);--border:rgba(0,201,177,.16);--border2:rgba(255,255,255,.08);--text:#d8ede9;--muted:#7aada7;--white:#fff;--card:rgba(18,32,28,.9);--card2:rgba(15,28,24,.95);--red:#f04040;--amber:#f59e0b;--ok:#22c55e;--r:12px;--r2:18px;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Instrument Sans',sans-serif;background:var(--ink);color:var(--text);min-height:100vh}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:repeating-linear-gradient(-45deg,transparent,transparent 24px,rgba(255,255,255,.018) 24px,rgba(255,255,255,.018) 25px)}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--teal-dim);border-radius:99px}
+.skel{background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:skel 1.4s infinite;border-radius:6px;display:inline-block;height:1em;width:80%}
+@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:64px;background:rgba(14,21,18,.88);backdrop-filter:blur(16px);border-bottom:1px solid var(--border2)}
+.nav-logo{font-family:'Familjen Grotesk',sans-serif;font-weight:700;font-size:1.2rem;color:var(--teal);text-decoration:none;display:flex;align-items:center;gap:.5rem}
+.nav-links{display:flex;list-style:none;gap:.25rem}
+.nav-links a{font-size:.875rem;font-weight:500;color:var(--muted);text-decoration:none;padding:.4rem .75rem;border-radius:8px;transition:all .2s;display:flex;align-items:center;gap:.4rem;cursor:pointer}
+.nav-links a:hover,.nav-links a.on{color:var(--teal);background:var(--teal-pale)}
+.btn-logout{display:flex;align-items:center;gap:.4rem;font-size:.82rem;font-weight:600;color:var(--muted);padding:.42rem .9rem;border:1px solid var(--border2);border-radius:99px;transition:all .2s;cursor:pointer;background:none}
+.btn-logout:hover{border-color:rgba(240,64,64,.3);color:var(--red)}
+.nav-burger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:.4rem}
+.nav-burger span{display:block;width:22px;height:2px;background:var(--text);border-radius:2px;transition:all .3s}
+.nav-burger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.nav-burger.open span:nth-child(2){opacity:0}
+.nav-burger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.nav-mob{display:none;position:fixed;top:64px;left:0;right:0;background:rgba(14,21,18,.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--border2);padding:1.25rem 1.5rem;z-index:99;flex-direction:column;gap:.5rem}
+.nav-mob.open{display:flex}
+.nav-mob a{font-size:.95rem;font-weight:500;color:var(--muted);text-decoration:none;padding:.6rem .5rem;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:.5rem;transition:color .2s;cursor:pointer}
+.nav-mob a:hover,.nav-mob a.on{color:var(--teal)}
+.nav-mob a.logout-mob{color:var(--red);border-bottom:none;margin-top:.25rem}
+.page-view{display:none}.page-view.on{display:block}
+.page{max-width:1200px;margin:0 auto;padding:2.5rem;position:relative;z-index:1}
+.welcome{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:1.75rem 2rem;margin-bottom:2rem;flex-wrap:wrap;opacity:0;transform:translateY(16px);animation:fu .55s .05s ease forwards}
+@keyframes fu{to{opacity:1;transform:translateY(0)}}
+.welcome-text h1{font-family:'Familjen Grotesk',sans-serif;font-size:1.5rem;font-weight:700;color:var(--white);letter-spacing:-.02em;margin-bottom:.2rem}
+.welcome-text p{font-size:.875rem;color:var(--muted)}
+.avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--teal-dim),var(--teal));display:flex;align-items:center;justify-content:center;color:var(--ink);font-weight:700;font-size:1.1rem;flex-shrink:0}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-bottom:2rem}
+.stat-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:1.5rem;display:flex;align-items:flex-start;gap:1.1rem;transition:all .3s;opacity:0;transform:translateY(16px);animation:fu .55s ease forwards}
+.stat-card:nth-child(1){animation-delay:.1s}.stat-card:nth-child(2){animation-delay:.18s}.stat-card:nth-child(3){animation-delay:.26s}
+.stat-card:hover{border-color:var(--border);transform:translateY(-3px)!important;box-shadow:0 14px 36px rgba(0,0,0,.35)}
+.stat-ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-ico.red{background:rgba(240,64,64,.12);border:1px solid rgba(240,64,64,.18);color:#f87171}
+.stat-ico.blue{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.18);color:#93c5fd}
+.stat-ico.teal{background:var(--teal-pale);border:1px solid var(--border);color:var(--teal)}
+.stat-body{flex:1;min-width:0}
+.stat-lbl{font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
+.stat-val{font-family:'Familjen Grotesk',sans-serif;font-size:1.5rem;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-note{font-size:.74rem;color:var(--muted);margin-top:.2rem}
+.main-grid{display:grid;grid-template-columns:1fr 300px;gap:1.5rem;margin-bottom:1.5rem}
+.tbox,.fee-panel,.hbox{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:2rem;opacity:0;transform:translateY(16px);animation:fu .55s ease forwards}
+.tbox{animation-delay:.3s}.fee-panel{animation-delay:.38s;padding:1.75rem}.hbox{animation-delay:.44s}
+.box-title{font-family:'Familjen Grotesk',sans-serif;font-size:1.05rem;font-weight:700;color:var(--white);margin-bottom:.25rem}
+.box-sub{font-size:.82rem;color:var(--muted);margin-bottom:1.5rem}
+.tabs{display:flex;padding:.25rem;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:1.75rem}
+.tab{flex:1;padding:.62rem .5rem;background:transparent;border:none;border-radius:8px;font-family:inherit;font-size:.82rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all .25s;text-align:center}
+.tab.on{background:var(--teal);color:var(--ink);box-shadow:0 2px 12px var(--teal-glow)}
+.tab:not(.on):hover{color:var(--text)}
+.pane{display:none}.pane.on{display:block}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:.75rem}
+.fg{margin-bottom:.75rem}
+.fg label{display:block;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
+.fi{width:100%;padding:.78rem 1rem;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:var(--r);font-size:.9rem;font-family:inherit;color:var(--text);outline:none;transition:all .22s}
+.fi::placeholder{color:rgba(122,173,167,.3)}
+.fi:focus{border-color:var(--teal);background:var(--teal-pale);box-shadow:0 0 0 3px rgba(0,201,177,.1)}
+.fee-box{background:rgba(0,201,177,.05);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;margin:.75rem 0}
+.fee-row{display:flex;justify-content:space-between;font-size:.84rem;margin-bottom:.5rem}
+.fee-row:last-child{margin:0;border-top:1px solid var(--border2);padding-top:.55rem;font-weight:700}
+.fee-row .fl{color:var(--muted)}.fee-row .fv{color:var(--text)}
+.fee-row.total .fv{color:var(--teal);font-family:'Familjen Grotesk',sans-serif;font-size:.95rem}
+.btn-send{width:100%;padding:.88rem;background:var(--teal);color:var(--ink);border:none;border-radius:var(--r);font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;transition:all .22s;display:flex;align-items:center;justify-content:center;gap:.5rem;position:relative;overflow:hidden;margin-top:.5rem}
+.btn-send:hover{background:#00e0c5;transform:translateY(-1px);box-shadow:0 6px 20px var(--teal-glow)}
+.btn-send.ld{pointer-events:none;opacity:.7}
+.spin{width:15px;height:15px;border:2.5px solid rgba(14,21,18,.3);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite;display:none}
+.btn-send.ld .spin{display:block}.btn-send.ld .slbl{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fi-card{background:var(--ink3);border:1px solid var(--border2);border-radius:var(--r);padding:1.1rem;margin-bottom:.85rem;transition:all .25s}
+.fi-card:last-of-type{margin-bottom:0}.fi-card:hover{border-color:var(--border)}
+.fi-top{display:flex;align-items:center;gap:.85rem;margin-bottom:.5rem}
+.fi-badge{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.68rem;font-weight:800;color:#fff}
+.fi-badge.mc{background:linear-gradient(135deg,#7f1d1d,#b91c1c)}.fi-badge.nc{background:linear-gradient(135deg,#1e3a5f,#1d4ed8)}
+.fi-name{font-family:'Familjen Grotesk',sans-serif;font-size:.88rem;font-weight:700;color:var(--white);margin-bottom:.1rem}
+.fi-pct{font-size:1.15rem;font-weight:800;color:var(--teal);font-family:'Familjen Grotesk',sans-serif}
+.fi-note{font-size:.76rem;color:var(--muted)}
+.table-wrap{overflow-x:auto;margin-top:1.25rem}
+table{width:100%;border-collapse:collapse;min-width:500px}
+th{font-size:.72rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:.7rem 1rem;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap}
+td{padding:.88rem 1rem;font-size:.875rem;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+tbody tr{transition:background .15s}tbody tr:hover{background:rgba(255,255,255,.025)}tbody tr:last-child td{border-bottom:none}
+.badge{display:inline-flex;align-items:center;gap:.3rem;padding:.28rem .7rem;border-radius:99px;font-size:.74rem;font-weight:600}
+.badge.done{background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.18)}
+.badge.pend{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.18)}
+.badge.fail{background:rgba(240,64,64,.1);color:#f87171;border:1px solid rgba(240,64,64,.18)}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.type-tag{font-size:.78rem;font-weight:700;color:var(--teal);font-family:'Familjen Grotesk',sans-serif}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted);font-size:.9rem}
+/* HISTORY */
+.filter-bar{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.filter-select{padding:.55rem 1rem;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:var(--r);font-family:inherit;font-size:.85rem;color:var(--text);outline:none;cursor:pointer}
+.filter-select:focus{border-color:var(--teal)}.filter-select option{background:var(--ink2)}
+.pagination{display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:1.5rem}
+.pg-btn{padding:.5rem .9rem;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:8px;font-family:inherit;font-size:.82rem;color:var(--muted);cursor:pointer;transition:all .2s}
+.pg-btn:hover:not(:disabled){border-color:var(--border);color:var(--text)}.pg-btn:disabled{opacity:.3;cursor:not-allowed}
+.pg-info{font-size:.82rem;color:var(--muted);padding:0 .5rem}
+/* DISPUTES */
+.dispute-banner{display:flex;align-items:flex-start;gap:.85rem;padding:1rem 1.25rem;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);margin-bottom:1.25rem}
+.dispute-banner-icon{width:32px;height:32px;border-radius:8px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.25);display:flex;align-items:center;justify-content:center;color:#fbbf24;flex-shrink:0}
+.dispute-banner-body{flex:1;font-size:.82rem;color:var(--muted);line-height:1.55}
+.dispute-banner-body strong{color:#fbbf24;display:block;margin-bottom:.15rem;font-size:.84rem}
+.dsp-card{background:var(--ink3);border:1px solid var(--border2);border-radius:var(--r);padding:1.1rem 1.25rem;transition:border-color .2s;margin-bottom:.75rem}
+.dsp-card:last-child{margin-bottom:0}
+.dsp-card:hover{border-color:rgba(255,255,255,.14)}
+.dsp-card-top{display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem;flex-wrap:wrap}
+.dsp-ref{font-family:'Familjen Grotesk',sans-serif;font-size:.82rem;font-weight:700;color:var(--white)}
+.dsp-reason{font-size:.74rem;font-weight:600;color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:99px;padding:.18rem .6rem;text-transform:capitalize}
+.dsp-status{display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .65rem;border-radius:99px;font-size:.72rem;font-weight:600;margin-left:auto}
+.dsp-status::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.dsp-status.open{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.18)}
+.dsp-status.under_review{background:rgba(59,130,246,.1);color:#93c5fd;border:1px solid rgba(59,130,246,.18)}
+.dsp-status.resolved{background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.18)}
+.dsp-status.rejected{background:rgba(240,64,64,.1);color:#f87171;border:1px solid rgba(240,64,64,.18)}
+.dsp-status.cancelled{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border2)}
+.dsp-meta{font-size:.8rem;color:var(--muted);margin-bottom:.5rem}
+.dsp-desc{font-size:.82rem;color:var(--text);line-height:1.55;margin-bottom:.7rem;padding:.7rem .85rem;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid var(--border2)}
+.dsp-admin-notes{font-size:.8rem;line-height:1.5;padding:.6rem .85rem;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:8px;color:#86efac;margin-top:.5rem}
+.dsp-refund{display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;font-weight:600;color:#4ade80;margin-top:.4rem}
+.dsp-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-top:.75rem;padding-top:.75rem;border-top:1px solid rgba(255,255,255,.05)}
+.btn-dispute-open{display:inline-flex;align-items:center;gap:.35rem;padding:.42rem .9rem;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.22);border-radius:8px;font-family:inherit;font-size:.78rem;font-weight:600;color:#fbbf24;cursor:pointer;transition:all .2s}
+.btn-dispute-open:hover{background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.4)}
+.btn-dispute-cancel{display:inline-flex;align-items:center;gap:.35rem;padding:.38rem .85rem;background:transparent;border:1px solid var(--border2);border-radius:8px;font-family:inherit;font-size:.76rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s}
+.btn-dispute-cancel:hover{border-color:rgba(240,64,64,.3);color:var(--red)}
+/* Dispute modal */
+.dmodal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1.5rem;opacity:0;pointer-events:none;transition:opacity .25s}
+.dmodal-overlay.open{opacity:1;pointer-events:all}
+.dmodal{background:var(--card2);border:1px solid var(--border2);border-radius:var(--r2);width:100%;max-width:480px;box-shadow:0 32px 64px rgba(0,0,0,.6);animation:modalIn .3s cubic-bezier(.16,1,.3,1)}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:none}}
+.dmodal-head{display:flex;align-items:center;justify-content:space-between;padding:1.35rem 1.5rem;border-bottom:1px solid var(--border2)}
+.dmodal-title{font-family:'Familjen Grotesk',sans-serif;font-size:1rem;font-weight:700;color:var(--white)}
+.dmodal-close{background:none;border:none;color:var(--muted);cursor:pointer;padding:.25rem;border-radius:6px;transition:color .2s}
+.dmodal-close:hover{color:var(--text)}
+.dmodal-body{padding:1.5rem}
+.dmodal-footer{padding:1rem 1.5rem;border-top:1px solid var(--border2);display:flex;gap:.75rem;justify-content:flex-end}
+.dmodal-tx-info{background:var(--ink3);border:1px solid var(--border2);border-radius:var(--r);padding:1rem;margin-bottom:1.25rem;font-size:.82rem}
+.dmodal-tx-info .row{display:flex;justify-content:space-between;margin-bottom:.4rem;color:var(--muted)}
+.dmodal-tx-info .row:last-child{margin:0;padding-top:.4rem;border-top:1px solid var(--border2);font-weight:700}
+.dmodal-tx-info .row span:last-child{color:var(--text)}
+.fg-dsp{margin-bottom:1rem}
+.fg-dsp label{display:block;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
+.fi-dsp{width:100%;padding:.72rem 1rem;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:var(--r);font-size:.88rem;font-family:inherit;color:var(--text);outline:none;transition:all .22s}
+.fi-dsp:focus{border-color:var(--teal);background:var(--teal-pale);box-shadow:0 0 0 3px rgba(0,201,177,.1)}
+.fi-dsp option{background:var(--ink2)}
+textarea.fi-dsp{resize:vertical;min-height:90px;line-height:1.55}
+.char-count{font-size:.72rem;color:var(--muted);text-align:right;margin-top:.2rem}
+.window-warn{font-size:.78rem;color:var(--amber);background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);border-radius:8px;padding:.55rem .85rem;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+/* SETTINGS */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.settings-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:2rem}
+.settings-card h2{font-family:'Familjen Grotesk',sans-serif;font-size:1rem;font-weight:700;color:var(--white);margin-bottom:.25rem}
+.settings-card .sub{font-size:.82rem;color:var(--muted);margin-bottom:1.5rem}
+.sg{margin-bottom:1rem}
+.sg label{display:block;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
+.si{width:100%;padding:.78rem 1rem;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:var(--r);font-size:.9rem;font-family:inherit;color:var(--text);outline:none;transition:all .22s}
+.si:focus{border-color:var(--teal);background:var(--teal-pale);box-shadow:0 0 0 3px rgba(0,201,177,.1)}
+.si:disabled{opacity:.5;cursor:not-allowed}
+.btn-save{padding:.78rem 1.5rem;background:var(--teal);color:var(--ink);border:none;border-radius:var(--r);font-family:inherit;font-size:.88rem;font-weight:700;cursor:pointer;transition:all .22s;display:flex;align-items:center;gap:.4rem}
+.btn-save:hover{background:#00e0c5;transform:translateY(-1px)}.btn-save.ld{pointer-events:none;opacity:.7}
+.kyc-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .8rem;border-radius:99px;font-size:.78rem;font-weight:600;margin-bottom:1rem}
+.kyc-badge.pending{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.18)}
+.kyc-badge.verified{background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.18)}
+.kyc-badge.rejected{background:rgba(240,64,64,.1);color:#f87171;border:1px solid rgba(240,64,64,.18)}
+.toast{position:fixed;bottom:1.75rem;right:1.75rem;padding:.8rem 1.3rem;border-radius:12px;font-size:.85rem;font-weight:600;z-index:9999;transform:translateY(80px);opacity:0;transition:all .4s cubic-bezier(.16,1,.3,1);max-width:340px;display:flex;align-items:center;gap:.6rem}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:#14532d;color:#86efac;border:1px solid rgba(134,239,172,.18);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.toast.error{background:#7f1d1d;color:#fca5a5;border:1px solid rgba(252,165,165,.18);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;position:relative;z-index:1}
+.foot-copy{font-size:.77rem;color:rgba(122,173,167,.4)}.foot-links{display:flex;gap:1.5rem}
+.foot-links a{font-size:.77rem;color:var(--muted);text-decoration:none;transition:color .2s}.foot-links a:hover{color:var(--teal)}
+@media(max-width:1024px){.main-grid{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr}}
+@media(max-width:768px){.stats-row{grid-template-columns:1fr 1fr}.nav-links,.btn-logout{display:none}.nav-burger{display:flex}.nav{padding:0 1.25rem}.page{padding:1.5rem 1.25rem}footer{padding:1.25rem}.frow{grid-template-columns:1fr}}
+@media(max-width:480px){.stats-row{grid-template-columns:1fr}.welcome{padding:1.25rem}.tbox,.fee-panel,.hbox{padding:1.5rem}}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <svg width="20" height="20" viewBox="0 0 48 48" fill="currentColor"><path d="M13.8 30.6C16.7 29.9 20.2 29.5 24 29.5s7.3.4 10.2 1.1c2.7.6 5.8 2.2 7.2 3.2L24.8 7.4a1 1 0 00-1.7 0L6.6 33.8c1.4-1 4.5-2.5 7.2-3.2z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M24 44c-5.1 0-9.9-.7-13.4-1.9-1.7-.6-3.3-1.4-4.5-2.4C4.9 38.7 4 37.4 4 35.7c0-.9.3-1.7.5-2.1L21 6.3a3 3 0 015.1 0l16.5 27.3c.2.3.6 1.1.6 2.1 0 1.7-.9 3-2.1 3.9-1.2 1-2.8 1.8-4.5 2.4C33.9 43.3 29.1 44 24 44zm12-15L24 9.8 12 29c.45-.16.9-.27 1.36-.37C16.43 27.9 20.1 27.5 24 27.5s7.57.4 10.64 1.13L36 29z"/></svg>SwitchCash
+  </a>
+  <ul class="nav-links">
+    <li><a onclick="showPage('dashboard')" id="nav-dashboard" class="on">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a></li>
+    <li><a onclick="showPage('history')" id="nav-history">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4"/></svg>History</a></li>
+    <li><a onclick="showPage('disputes')" id="nav-disputes">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Disputes</a></li>
+    <li><a onclick="showPage('settings')" id="nav-settings">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</a></li>
+  </ul>
+  <button class="btn-logout" onclick="SC.logout()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout
+  </button>
+  <button class="nav-burger" id="burger"><span></span><span></span><span></span></button>
+</nav>
+<div class="nav-mob" id="navMob">
+  <a onclick="showPage('dashboard');closeMob()" id="mob-dashboard" class="on">Dashboard</a>
+  <a onclick="showPage('history');closeMob()" id="mob-history">History</a>
+  <a onclick="showPage('disputes');closeMob()" id="mob-disputes">Disputes</a>
+  <a onclick="showPage('settings');closeMob()" id="mob-settings">Settings</a>
+  <a class="logout-mob" onclick="SC.logout()">Logout</a>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page-view on" id="view-dashboard">
+  <div class="page">
+    <div class="welcome">
+      <div class="welcome-text"><h1 id="welcome-name">Welcome back…</h1><p>Instant · Secure · Local transfers between MonCash and NatCash</p></div>
+      <div class="avatar" id="avatar-icon">–</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-ico red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div><div class="stat-body"><div class="stat-lbl">Balance</div><div class="stat-val" id="stat-balance"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div><div class="stat-note">HTG wallet</div></div></div>
+      <div class="stat-card"><div class="stat-ico blue"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div><div class="stat-body"><div class="stat-lbl">Total Sent</div><div class="stat-val" id="stat-sent"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div><div class="stat-note">Completed transfers</div></div></div>
+      <div class="stat-card"><div class="stat-ico teal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></div><div class="stat-body"><div class="stat-lbl">Total Received</div><div class="stat-val" id="stat-received"><span class="skel">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></div><div class="stat-note">Incoming transfers</div></div></div>
+    </div>
+    <div class="main-grid">
+      <div class="tbox">
+        <div class="box-title">Transfer Money</div>
+        <div class="box-sub">Enter amount and recipient phone number.</div>
+        <div class="tabs">
+          <button class="tab on" id="t1" onclick="switchTab(1)">MonCash &rarr; NatCash</button>
+          <button class="tab" id="t2" onclick="switchTab(2)">NatCash &rarr; MonCash</button>
+        </div>
+        <div class="pane on" id="p1">
+          <div class="frow"><div class="fg"><label>Amount (HTG)</label><input class="fi" type="number" id="a1" placeholder="Max 50,000" min="1" max="50000" oninput="calc(1)"/></div><div class="fg"><label>Recipient Phone</label><input class="fi" type="tel" id="ph1" placeholder="+509 XX XX XXXX"/></div></div>
+          <div class="fee-box"><div class="fee-row"><span class="fl">Amount</span><span class="fv" id="d1a">0.00 HTG</span></div><div class="fee-row"><span class="fl">Fee (5%)</span><span class="fv" style="color:var(--teal)" id="d1f">0.00 HTG</span></div><div class="fee-row total"><span class="fl">Total deducted</span><span class="fv" id="d1t">0.00 HTG</span></div></div>
+          <button class="btn-send" id="s1" onclick="send(1)"><div class="spin" id="sp1"></div><span class="slbl" style="display:flex;align-items:center;gap:.45rem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send Transfer</span></button>
+        </div>
+        <div class="pane" id="p2">
+          <div class="frow"><div class="fg"><label>Amount (HTG)</label><input class="fi" type="number" id="a2" placeholder="Max 75,000" min="1" max="75000" oninput="calc(2)"/></div><div class="fg"><label>Recipient Phone</label><input class="fi" type="tel" id="ph2" placeholder="+509 XX XX XXXX"/></div></div>
+          <div class="fee-box"><div class="fee-row"><span class="fl">Amount</span><span class="fv" id="d2a">0.00 HTG</span></div><div class="fee-row"><span class="fl">Fee (5%)</span><span class="fv" style="color:var(--teal)" id="d2f">0.00 HTG</span></div><div class="fee-row total"><span class="fl">Total deducted</span><span class="fv" id="d2t">0.00 HTG</span></div></div>
+          <button class="btn-send" id="s2" onclick="send(2)"><div class="spin" id="sp2"></div><span class="slbl" style="display:flex;align-items:center;gap:.45rem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send Transfer</span></button>
+        </div>
+      </div>
+      <div class="fee-panel">
+        <div class="box-title" style="margin-bottom:1.25rem">Fee Structure</div>
+        <div class="fi-card"><div class="fi-top"><div class="fi-badge mc">MC</div><div><div class="fi-name">MonCash &rarr; NatCash</div><div class="fi-pct">5% flat</div></div></div><div class="fi-note">Max per transaction: 50,000 HTG</div></div>
+        <div class="fi-card"><div class="fi-top"><div class="fi-badge nc">NC</div><div><div class="fi-name">NatCash &rarr; MonCash</div><div class="fi-pct">5% flat</div></div></div><div class="fi-note">Max per transaction: 75,000 HTG</div></div>
+        <p style="font-size:.77rem;color:var(--muted);margin-top:1.1rem;line-height:1.6">No hidden fees. Fee is shown before you confirm every transfer.</p>
+      </div>
+    </div>
+    <div class="hbox">
+      <div class="box-title">Recent Transactions</div><div class="box-sub">Your latest transfer activity</div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Counterpart</th><th>Amount</th><th>Fee</th><th>Status</th></tr></thead><tbody id="recent-tbody"><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody></table></div>
+    </div>
+  </div>
+  <div id="err-state" style="display:none;align-items:center;justify-content:center;gap:1rem;padding:2rem;background:var(--card);border:1px solid rgba(240,64,64,.2);border-radius:var(--r2);margin-bottom:1.5rem;position:relative;z-index:1"><span style="color:var(--muted);font-size:.9rem">Failed to load dashboard data.</span><button onclick="retryDashboard()" style="padding:.5rem 1.2rem;background:var(--teal);color:var(--ink);border:none;border-radius:var(--r);font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer">Retry</button></div>
+</div>
+
+<!-- HISTORY -->
+<div class="page-view" id="view-history">
+  <div class="page">
+    <div class="welcome"><div class="welcome-text"><h1>Transaction History</h1><p>Full record of all your transfers</p></div></div>
+    <div class="hbox" style="animation-delay:.1s">
+      <div class="filter-bar">
+        <select class="filter-select" id="hist-type" onchange="histPage=0;loadHistory()"><option value="">All Types</option><option value="send">Sent</option><option value="receive">Received</option><option value="deposit">Deposits</option></select>
+        <select class="filter-select" id="hist-status" onchange="histPage=0;loadHistory()"><option value="">All Statuses</option><option value="completed">Completed</option><option value="pending">Pending</option><option value="failed">Failed</option></select>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Reference</th><th>Type</th><th>Counterpart</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody id="hist-tbody"><tr><td colspan="7" class="empty-state">Loading…</td></tr></tbody></table></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DISPUTES -->
+<div class="page-view" id="view-disputes">
+  <div class="page">
+    <div class="welcome"><div class="welcome-text"><h1>My Disputes</h1><p>Track and manage your transfer dispute cases</p></div></div>
+
+    <div class="hbox" style="animation-delay:.1s">
+      <div class="dispute-banner">
+        <div class="dispute-banner-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="dispute-banner-body">
+          <strong>Not satisfied with a transfer?</strong>
+          You can dispute a completed transfer within <strong>72 hours</strong> of completion. Go to <a onclick="showPage('history')" style="color:var(--teal);cursor:pointer;text-decoration:underline">Transaction History</a> and click <em>Dispute</em> on any eligible transfer.
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem">
+        <div style="font-family:'Familjen Grotesk',sans-serif;font-size:.95rem;font-weight:700;color:var(--white)">Your Cases</div>
+        <select class="filter-select" id="dsp-filter" onchange="loadDisputes()">
+          <option value="">All</option>
+          <option value="open">Open</option>
+          <option value="under_review">Under Review</option>
+          <option value="resolved">Resolved</option>
+          <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      <div id="dsp-list"><div style="text-align:center;padding:3rem 1rem;color:var(--muted);font-size:.9rem">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Dispute Modal -->
+<div class="dmodal-overlay" id="dspOverlay">
+  <div class="dmodal">
+    <div class="dmodal-head">
+      <div class="dmodal-title">File a Dispute</div>
+      <button class="dmodal-close" onclick="closeDspModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="dmodal-body">
+      <div class="window-warn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        You have <strong id="dsp-hours-left" style="color:var(--amber);margin:0 .2rem">—</strong> hours left to dispute this transfer.
+      </div>
+      <div class="dmodal-tx-info" id="dsp-tx-info">
+        <div class="row"><span>Transfer Ref</span><span id="dsp-tx-ref">—</span></div>
+        <div class="row"><span>Recipient</span><span id="dsp-tx-phone">—</span></div>
+        <div class="row"><span>Date</span><span id="dsp-tx-date">—</span></div>
+        <div class="row"><span>Amount</span><span id="dsp-tx-amount">—</span></div>
+      </div>
+      <div class="fg-dsp">
+        <label>Reason for dispute</label>
+        <select class="fi-dsp" id="dsp-reason">
+          <option value="">Select a reason…</option>
+          <option value="wrong_amount">Wrong amount processed</option>
+          <option value="transfer_not_received">Transfer not received by recipient</option>
+          <option value="duplicate_charge">Duplicate charge</option>
+          <option value="unauthorized_transfer">Unauthorized transfer</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="fg-dsp">
+        <label>Describe the issue</label>
+        <textarea class="fi-dsp" id="dsp-description" placeholder="Please provide as much detail as possible (min 20 characters)…" maxlength="2000" oninput="document.getElementById('dsp-char').textContent=this.value.length+'/2000'"></textarea>
+        <div class="char-count" id="dsp-char">0/2000</div>
+      </div>
+    </div>
+    <div class="dmodal-footer">
+      <button class="btn-dispute-cancel" onclick="closeDspModal()">Cancel</button>
+      <button class="btn-dispute-open" id="dsp-submit-btn" onclick="submitDispute()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <span id="dsp-submit-lbl">Submit Dispute</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page-view" id="view-settings">
+  <div class="page">
+    <div class="welcome"><div class="welcome-text"><h1>Settings</h1><p>Manage your account and preferences</p></div></div>
+    <div class="settings-grid">
+      <div class="settings-card">
+        <h2>Profile Information</h2><p class="sub">Update your personal details</p>
+        <div class="kyc-badge pending" id="kyc-badge">● KYC Pending</div>
+        <div class="sg"><label>Full Name</label><input class="si" type="text" id="set-name" placeholder="Jean Pierre"/></div>
+        <div class="sg"><label>Email Address</label><input class="si" type="email" id="set-email" disabled/></div>
+        <div class="sg"><label>Phone Number</label><input class="si" type="tel" id="set-phone" placeholder="+509 XX XX XXXX"/></div>
+        <div class="sg"><label>Country</label><select class="si" id="set-country"><option value="HT">Haiti</option><option value="DO">Dominican Republic</option><option value="US">United States</option><option value="CA">Canada</option><option value="FR">France</option></select></div>
+        <button class="btn-save" id="save-btn" onclick="saveProfile()"><div class="spin" id="save-spin"></div><span id="save-lbl">Save Changes</span></button>
+      </div>
+      <div class="settings-card">
+        <h2>Wallet Overview</h2><p class="sub">Your current balance and activity</p>
+        <div style="background:var(--ink3);border:1px solid var(--border2);border-radius:var(--r);padding:1.25rem;margin-bottom:1rem">
+          <div style="font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">Available Balance</div>
+          <div style="font-family:'Familjen Grotesk',sans-serif;font-size:2rem;font-weight:700;color:var(--teal)" id="set-balance">—</div>
+        </div>
+        <div style="background:var(--ink3);border:1px solid var(--border2);border-radius:var(--r);padding:1.25rem">
+          <div style="font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Activity Summary</div>
+          <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:.5rem"><span style="color:var(--muted)">Total Sent</span><span id="set-sent">—</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:.5rem"><span style="color:var(--muted)">Total Received</span><span id="set-received">—</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:.85rem"><span style="color:var(--muted)">Total Transactions</span><span id="set-txns">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<footer><span class="foot-copy">&copy; 2025 SwitchCash. All rights reserved.</span><div class="foot-links"><a href="index.html">Home</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Support</a></div></footer>
+
+<script src="api.js"></script>
+<script>
+SC.requireAuth();
+let histPage = 0;
+const LIMIT  = 20;
+
+// Disputes API helpers
+SC.getDisputes    = (status) => SC.fetch('/disputes' + (status ? '?status=' + status : ''));
+SC.openDispute    = (body)   => SC.fetch('/disputes', { method: 'POST', body: JSON.stringify(body) });
+SC.cancelDispute  = (id)     => SC.fetch('/disputes/' + id + '/cancel', { method: 'POST' });
+
+// Toast
+let toastT;
+function toast(msg, type) {
+  clearTimeout(toastT);
+  const el = document.getElementById('toast');
+  const icon = type === 'success'
+    ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>'
+    : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+  el.innerHTML = icon + '<span>' + msg + '</span>';
+  el.className = 'toast ' + type;
+  el.classList.add('show');
+  toastT = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// Nav
+function showPage(page) {
+  ['dashboard','history','disputes','settings'].forEach(p => {
+    document.getElementById('view-' + p).classList.toggle('on', p === page);
+    document.getElementById('nav-'  + p).classList.toggle('on', p === page);
+    const mob = document.getElementById('mob-' + p);
+    if (mob) mob.classList.toggle('on', p === page);
+  });
+  if (page === 'history')  loadHistory();
+  if (page === 'settings') loadSettings();
+  if (page === 'disputes') loadDisputes();
+}
+const burger = document.getElementById('burger'), mob = document.getElementById('navMob');
+burger.addEventListener('click', () => { burger.classList.toggle('open'); mob.classList.toggle('open'); });
+function closeMob() { burger.classList.remove('open'); mob.classList.remove('open'); }
+
+// Animate val
+function animVal(el, v) { el.style.opacity='0'; setTimeout(() => { el.textContent=v; el.style.transition='opacity .25s'; el.style.opacity='1'; }, 220); }
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const [profile, wallet, analytics, txns] = await Promise.all([
+      SC.getProfile(), SC.getWallet(), SC.getAnalytics(), SC.getTransactions({ limit: 5 })
+    ]);
+
+    const name  = profile.full_name || profile.email || 'there';
+    const first = name.split(' ')[0];
+    document.getElementById('welcome-name').textContent = 'Welcome back, ' + first;
+    document.getElementById('avatar-icon').textContent  = first.charAt(0).toUpperCase();
+
+    animVal(document.getElementById('stat-balance'),  SC.fmt(wallet.primary?.balance));
+    animVal(document.getElementById('stat-sent'),     SC.fmt(analytics.summary?.total_sent));
+    animVal(document.getElementById('stat-received'), SC.fmt(analytics.summary?.total_received));
+
+    renderRows('recent-tbody', txns.transactions, true);
+  } catch (err) {
+    if (err.message && err.message.includes('Session expired')) return;
+    toast(err.message || 'Failed to load dashboard data. Check your connection.', 'error');
+    const errEl = document.getElementById('err-state');
+    if (errEl) errEl.style.display = 'flex';
+  }
+}
+
+function renderRows(tbodyId, txns, isRecent) {
+  const tbody = document.getElementById(tbodyId);
+  if (!txns || !txns.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No transactions yet</td></tr>'; return; }
+  tbody.innerHTML = txns.map(t => {
+    const isSend      = t.type === 'send';
+    const fee         = isRecent ? SC.fmt(isSend ? t.amount * 0.05 : 0) : null;
+    const counterpart = isSend ? (t.receiver_name || '—') : (t.sender_name || '—');
+    const sc          = t.status === 'completed' ? 'done' : t.status === 'pending' ? 'pend' : 'fail';
+    const sl          = t.status.charAt(0).toUpperCase() + t.status.slice(1);
+    const type        = t.type.charAt(0).toUpperCase() + t.type.slice(1);
+    // Show Dispute button for completed outgoing transfers in history view
+    const canDispute  = !isRecent && isSend && t.status === 'completed';
+    const hoursOld    = canDispute ? (Date.now() - new Date(t.completed_at || t.created_at).getTime()) / 3600000 : 999;
+    const withinWindow = hoursOld <= 72;
+    const disputeBtn  = canDispute && withinWindow
+      ? `<button class="btn-dispute-open" style="padding:.3rem .65rem;font-size:.72rem" onclick="openDspModal('${t.id}','${(t.reference||'').replace(/'/g,'')}',' ${t.recipient_phone||''}','${t.completed_at||t.created_at}',${t.amount})">
+           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>Dispute
+         </button>`
+      : (canDispute ? '<span style="font-size:.72rem;color:var(--muted)">Window closed</span>' : '');
+    return `<tr>
+      <td>${SC.fmtDate(t.created_at)}</td>
+      ${!isRecent ? `<td style="color:var(--muted);font-size:.78rem">${t.reference||'—'}</td>` : ''}
+      <td><span class="type-tag">${type}</span></td>
+      <td style="color:var(--muted)">${counterpart}</td>
+      <td>${SC.fmt(t.amount)}</td>
+      ${isRecent ? `<td style="color:var(--muted)">${fee}</td>` : ''}
+      <td><span class="badge ${sc}">${sl}</span></td>
+      ${!isRecent ? `<td>${disputeBtn}</td>` : ''}
+    </tr>`;
+  }).join('');
+}
+
+// Transfer form
+function calc(t) {
+  const a = parseFloat(document.getElementById('a'+t).value)||0, fee=a*.05;
+  document.getElementById('d'+t+'a').textContent=SC.fmt(a);
+  document.getElementById('d'+t+'f').textContent=SC.fmt(fee);
+  document.getElementById('d'+t+'t').textContent=SC.fmt(a+fee);
+}
+function switchTab(t) { [1,2].forEach(i=>{document.getElementById('t'+i).classList.toggle('on',i===t);document.getElementById('p'+i).classList.toggle('on',i===t);}); }
+
+async function send(t) {
+  const amt=parseFloat(document.getElementById('a'+t).value)||0, phone=document.getElementById('ph'+t).value.trim(), max=t===1?50000:75000;
+  if (!amt||amt<=0) { toast('Please enter a valid amount.','error'); return; }
+  if (amt>max)      { toast('Max transfer is '+max.toLocaleString()+' HTG.','error'); return; }
+  if (!phone)       { toast('Please enter a recipient phone number.','error'); return; }
+  const btn=document.getElementById('s'+t); btn.classList.add('ld');
+  try {
+    await SC.sendMoney(phone, amt, 'HTG', t===1?'MonCash to NatCash':'NatCash to MonCash');
+    toast(SC.fmt(amt)+' sent successfully!', 'success');
+    document.getElementById('a'+t).value=''; document.getElementById('ph'+t).value=''; calc(t);
+    loadDashboard();
+
+async function retryDashboard() {
+  document.getElementById('err-state').style.display = 'none';
+  await loadDashboard();
+}
+  } catch(err) { toast(err.message||'Transfer failed.','error'); }
+  finally { btn.classList.remove('ld'); }
+}
+
+// ── HISTORY ───────────────────────────────────────────────────
+async function loadHistory() {
+  const tbody=document.getElementById('hist-tbody');
+  tbody.innerHTML='<tr><td colspan="7" class="empty-state">Loading…</td></tr>';
+  try {
+    const type=document.getElementById('hist-type').value, status=document.getElementById('hist-status').value;
+    const opts={limit:LIMIT,offset:histPage*LIMIT};
+    if(type)   opts.type=type;
+    if(status) opts.status=status;
+    const data=await SC.getTransactions(opts);
+    renderRows('hist-tbody', data.transactions, false);
+    const total=data.pagination?.total||0, pages=Math.ceil(total/LIMIT);
+    const pg=document.getElementById('pagination');
+    pg.innerHTML=pages<=1?'':`
+      <button class="pg-btn" onclick="changePage(-1)" ${histPage===0?'disabled':''}>&#8592; Prev</button>
+      <span class="pg-info">Page ${histPage+1} of ${pages}</span>
+      <button class="pg-btn" onclick="changePage(1)" ${histPage>=pages-1?'disabled':''}>Next &#8594;</button>`;
+  } catch(err) { tbody.innerHTML='<tr><td colspan="7" class="empty-state">Failed to load.</td></tr>'; toast(err.message,'error'); }
+}
+function changePage(dir) { histPage=Math.max(0,histPage+dir); loadHistory(); }
+
+// ── DISPUTES ──────────────────────────────────────────────────
+let currentDspTxId = null;
+
+function openDspModal(txId, ref, phone, completedAt, amount) {
+  currentDspTxId = txId;
+  const hoursLeft = Math.max(0, 72 - (Date.now() - new Date(completedAt).getTime()) / 3600000);
+  document.getElementById('dsp-hours-left').textContent = hoursLeft.toFixed(1);
+  document.getElementById('dsp-tx-ref').textContent    = ref || '—';
+  document.getElementById('dsp-tx-phone').textContent  = phone || '—';
+  document.getElementById('dsp-tx-date').textContent   = SC.fmtDate(completedAt);
+  document.getElementById('dsp-tx-amount').textContent = SC.fmt(amount);
+  document.getElementById('dsp-reason').value      = '';
+  document.getElementById('dsp-description').value = '';
+  document.getElementById('dsp-char').textContent  = '0/2000';
+  document.getElementById('dspOverlay').classList.add('open');
+}
+
+function closeDspModal() {
+  document.getElementById('dspOverlay').classList.remove('open');
+  currentDspTxId = null;
+}
+
+// Close on overlay click
+document.getElementById('dspOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeDspModal();
+});
+
+async function submitDispute() {
+  const reason      = document.getElementById('dsp-reason').value;
+  const description = document.getElementById('dsp-description').value.trim();
+  if (!reason)             { toast('Please select a reason.', 'error'); return; }
+  if (!description)        { toast('Please describe the issue.', 'error'); return; }
+  if (description.length < 20) { toast('Description must be at least 20 characters.', 'error'); return; }
+
+  const btn = document.getElementById('dsp-submit-btn');
+  const lbl = document.getElementById('dsp-submit-lbl');
+  btn.style.pointerEvents = 'none'; btn.style.opacity = '.7';
+  lbl.textContent = 'Submitting…';
+
+  try {
+    const data = await SC.openDispute({ transaction_id: currentDspTxId, reason, description });
+    closeDspModal();
+    toast('Dispute filed! Ref: ' + (data.dispute?.reference || ''), 'success');
+    showPage('disputes');
+  } catch(err) {
+    toast(err.message || 'Failed to submit dispute.', 'error');
+  } finally {
+    btn.style.pointerEvents = ''; btn.style.opacity = '';
+    lbl.textContent = 'Submit Dispute';
+  }
+}
+
+function reasonLabel(r) {
+  return { wrong_amount:'Wrong amount', transfer_not_received:'Not received', duplicate_charge:'Duplicate charge', unauthorized_transfer:'Unauthorized', other:'Other' }[r] || r;
+}
+
+function statusLabel(s) {
+  return { open:'Open', under_review:'Under Review', resolved:'Resolved', rejected:'Rejected', cancelled:'Cancelled' }[s] || s;
+}
+
+async function loadDisputes() {
+  const list   = document.getElementById('dsp-list');
+  const status = document.getElementById('dsp-filter').value;
+  list.innerHTML = '<div style="text-align:center;padding:3rem 1rem;color:var(--muted);font-size:.9rem">Loading…</div>';
+  try {
+    const data = await SC.getDisputes(status);
+    const disputes = data.disputes || [];
+    if (!disputes.length) {
+      list.innerHTML = '<div style="text-align:center;padding:3rem 1rem;color:var(--muted);font-size:.9rem">No disputes found.</div>';
+      return;
+    }
+    list.innerHTML = disputes.map(d => {
+      const sc = d.status;
+      const adminNoteHtml = d.admin_notes
+        ? `<div class="dsp-admin-notes">📋 Admin: ${d.admin_notes}</div>` : '';
+      const refundHtml = d.refund_issued
+        ? `<div class="dsp-refund"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Refund issued to wallet</div>` : '';
+      const cancelBtn  = sc === 'open'
+        ? `<button class="btn-dispute-cancel" onclick="cancelDispute('${d.id}')">Cancel Dispute</button>` : '';
+      return `<div class="dsp-card">
+        <div class="dsp-card-top">
+          <span class="dsp-ref">${d.reference}</span>
+          <span class="dsp-reason">${reasonLabel(d.reason)}</span>
+          <span class="dsp-status ${sc}">${statusLabel(sc)}</span>
+        </div>
+        <div class="dsp-meta">Tx Ref: ${d.tx_reference||'—'} · Amount: ${SC.fmt(d.amount)} · Filed: ${SC.fmtDate(d.created_at)}</div>
+        <div class="dsp-desc">${d.description}</div>
+        ${adminNoteHtml}${refundHtml}
+        ${cancelBtn || d.reviewed_at ? `<div class="dsp-footer">
+          ${cancelBtn}
+          ${d.reviewed_at ? `<span style="font-size:.76rem;color:var(--muted)">Reviewed ${SC.fmtDate(d.reviewed_at)}</span>` : ''}
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(err) {
+    list.innerHTML = '<div style="text-align:center;padding:3rem 1rem;color:var(--muted);font-size:.9rem">Failed to load disputes.</div>';
+    toast(err.message || 'Failed to load disputes.', 'error');
+  }
+}
+
+async function cancelDispute(id) {
+  if (!confirm('Cancel this dispute? This cannot be undone.')) return;
+  try {
+    await SC.cancelDispute(id);
+    toast('Dispute cancelled.', 'success');
+    loadDisputes();
+  } catch(err) {
+    toast(err.message || 'Failed to cancel dispute.', 'error');
+  }
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+async function loadSettings() {
+  try {
+    const [profile,wallet,analytics]=await Promise.all([SC.getProfile(),SC.getWallet(),SC.getAnalytics()]);
+    document.getElementById('set-name').value    = profile.full_name||'';
+    document.getElementById('set-email').value   = profile.email||'';
+    document.getElementById('set-phone').value   = profile.phone||'';
+    document.getElementById('set-country').value = profile.country||'HT';
+    const kyc=document.getElementById('kyc-badge');
+    kyc.className='kyc-badge '+(profile.kyc_status||'pending');
+    kyc.textContent='● KYC '+((profile.kyc_status||'pending').charAt(0).toUpperCase()+(profile.kyc_status||'pending').slice(1));
+    document.getElementById('set-balance').textContent  = SC.fmt(wallet.primary?.balance);
+    document.getElementById('set-sent').textContent     = SC.fmt(analytics.summary?.total_sent);
+    document.getElementById('set-received').textContent = SC.fmt(analytics.summary?.total_received);
+    document.getElementById('set-txns').textContent     = analytics.summary?.total_transactions||0;
+  } catch(err) { toast(err.message||'Failed to load settings','error'); }
+}
+
+async function saveProfile() {
+  const btn=document.getElementById('save-btn'), spin=document.getElementById('save-spin'), lbl=document.getElementById('save-lbl');
+  btn.classList.add('ld'); spin.style.display='block'; lbl.style.display='none';
+  try {
+    await SC.updateProfile({
+      full_name: document.getElementById('set-name').value.trim(),
+      phone:     document.getElementById('set-phone').value.trim(),
+      country:   document.getElementById('set-country').value,
+    });
+    toast('Profile updated successfully!','success');
+    const name=document.getElementById('set-name').value.trim();
+    if(name){ document.getElementById('welcome-name').textContent='Welcome back, '+name.split(' ')[0]; document.getElementById('avatar-icon').textContent=name.charAt(0).toUpperCase(); }
+  } catch(err) { toast(err.message||'Failed to save','error'); }
+  finally { btn.classList.remove('ld'); spin.style.display='none'; lbl.style.display='inline'; }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Agent Portal — SwitchCash</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0a1510;--ink2:#0f1e18;--ink3:#162418;
+  --teal:#00c9b1;--teal-dim:#009e8c;--teal-pale:rgba(0,201,177,.08);--teal-glow:rgba(0,201,177,.2);
+  --border:rgba(0,201,177,.14);--border2:rgba(255,255,255,.07);
+  --text:#d0ebe4;--muted:#6b9e96;--white:#fff;
+  --err:#f04040;--ok:#22c55e;--warn:#f59e0b;
+  --r:10px;--r2:16px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--ink);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+
+/* ── NAV ── */
+nav{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:58px;border-bottom:1px solid var(--border2);background:rgba(10,21,16,.95);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+.nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;color:var(--teal)}
+.nav-brand svg{flex-shrink:0}
+.agent-badge{font-size:12px;font-weight:500;padding:3px 10px;border-radius:99px;background:var(--teal-pale);border:1px solid var(--border);color:var(--teal)}
+.nav-right{display:flex;align-items:center;gap:12px}
+.online-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.agent-name{font-size:13px;color:var(--muted)}
+.btn-logout{font-size:12px;padding:5px 12px;border:1px solid var(--border2);border-radius:99px;background:transparent;color:var(--muted);cursor:pointer;transition:all .2s}
+.btn-logout:hover{border-color:var(--err);color:var(--err)}
+
+/* ── LAYOUT ── */
+.layout{display:flex;flex:1}
+.sidebar{width:220px;border-right:1px solid var(--border2);padding:20px 0;flex-shrink:0;background:var(--ink2)}
+.sb-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;transition:all .2s;border-left:2px solid transparent}
+.sb-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.sb-item.active{color:var(--teal);border-left-color:var(--teal);background:var(--teal-pale)}
+.sb-item svg{width:15px;height:15px;flex-shrink:0}
+.sb-badge{margin-left:auto;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--teal);color:var(--ink)}
+.page{flex:1;padding:28px;overflow-y:auto;max-width:960px}
+
+/* ── CARDS ── */
+.section-title{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+.stat-card{background:var(--ink2);border:1px solid var(--border2);border-radius:var(--r2);padding:16px}
+.stat-num{font-size:24px;font-weight:700;color:var(--white);line-height:1;margin-bottom:4px}
+.stat-num.teal{color:var(--teal)}
+.stat-lbl{font-size:11px;color:var(--muted)}
+
+/* ── TRANSFER CARDS ── */
+.transfer-list{display:flex;flex-direction:column;gap:10px}
+.tx-card{background:var(--ink2);border:1px solid var(--border2);border-radius:var(--r2);padding:18px 20px;transition:border-color .2s;position:relative;overflow:hidden}
+.tx-card:hover{border-color:var(--border)}
+.tx-card.claimed{border-color:var(--teal);background:rgba(0,201,177,.04)}
+.tx-card.blocked{opacity:.55;pointer-events:none}
+.tx-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.tx-amount{font-size:22px;font-weight:700;color:var(--white)}
+.tx-fee{font-size:12px;color:var(--muted);margin-top:2px}
+.tx-dir{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.dir-mc{color:#f59e0b}.dir-nc{color:#3b82f6}
+.tx-info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.tx-row{display:flex;flex-direction:column;gap:2px}
+.tx-label{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tx-value{font-size:13px;color:var(--text)}
+.tx-actions{display:flex;align-items:center;gap:10px}
+.btn-claim{padding:9px 22px;background:var(--teal);color:var(--ink);border:none;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-claim:hover{background:#00e0c5;transform:translateY(-1px)}
+.btn-claim:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.countdown{font-size:13px;font-weight:700;padding:9px 16px;border-radius:var(--r);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);color:var(--warn)}
+.countdown.urgent{background:rgba(240,64,64,.1);border-color:rgba(240,64,64,.2);color:var(--err)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-icon{width:48px;height:48px;margin:0 auto 14px;opacity:.3}
+.badge-attempt{font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;margin-left:8px}
+.badge-1{background:rgba(245,158,11,.12);color:var(--warn);border:1px solid rgba(245,158,11,.2)}
+.badge-2{background:rgba(240,64,64,.12);color:var(--err);border:1px solid rgba(240,64,64,.2)}
+
+/* ── ACTIVE CLAIM BANNER ── */
+.active-claim-banner{background:rgba(0,201,177,.06);border:1px solid var(--border);border-radius:var(--r2);padding:18px 20px;margin-bottom:24px}
+.acb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.acb-title{font-size:14px;font-weight:600;color:var(--teal)}
+.acb-timer{font-size:22px;font-weight:700;color:var(--warn)}
+.acb-timer.urgent{color:var(--err)}
+.acb-info{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.btn-complete{padding:10px 24px;background:var(--ok);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-complete:hover{opacity:.9}
+
+/* ── PROOF UPLOAD ── */
+.proof-area{border:1.5px dashed var(--border2);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;transition:border-color .2s;background:rgba(255,255,255,.02)}
+.proof-area:hover,.proof-area.drag{border-color:var(--teal);background:var(--teal-pale)}
+.proof-preview{max-width:100%;max-height:200px;border-radius:var(--r);margin-top:12px;object-fit:contain}
+
+/* ── HISTORY ── */
+.hist-table{width:100%;border-collapse:collapse}
+.hist-table th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border2)}
+.hist-table td{padding:11px 12px;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.03)}
+.hist-table tr:hover td{background:rgba(255,255,255,.02)}
+.status-pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px}
+.s-completed{background:rgba(34,197,94,.1);color:var(--ok);border:1px solid rgba(34,197,94,.2)}
+.s-expired{background:rgba(245,158,11,.1);color:var(--warn);border:1px solid rgba(245,158,11,.2)}
+.s-abandoned{background:rgba(100,100,100,.1);color:var(--muted);border:1px solid rgba(100,100,100,.15)}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999;padding:16px}
+.modal-box{background:var(--ink2);border:1px solid var(--border);border-radius:var(--r2);padding:28px;width:100%;max-width:460px}
+.modal-title{font-size:16px;font-weight:700;color:var(--white);margin-bottom:20px}
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.form-input{width:100%;padding:10px 13px;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:14px;outline:none;transition:border-color .2s;font-family:inherit}
+.form-input:focus{border-color:var(--teal);background:var(--teal-pale)}
+.form-textarea{resize:vertical;min-height:80px}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.btn-cancel-modal{flex:1;padding:10px;background:transparent;border:1px solid var(--border2);border-radius:var(--r);color:var(--muted);cursor:pointer;font-size:13px;font-weight:600}
+.btn-submit-modal{flex:2;padding:10px;background:var(--ok);border:none;border-radius:var(--r);color:#fff;cursor:pointer;font-size:13px;font-weight:700;transition:opacity .2s}
+.btn-submit-modal:hover{opacity:.9}
+.btn-submit-modal:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── LOGIN ── */
+.login-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:32px 16px}
+.login-card{background:var(--ink2);border:1px solid var(--border);border-radius:var(--r2);padding:36px 32px;width:100%;max-width:400px}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-logo svg{display:block;margin:0 auto 10px}
+.login-title{font-size:20px;font-weight:700;color:var(--white);text-align:center;margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:28px}
+.btn-login{width:100%;padding:12px;background:var(--teal);color:var(--ink);border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:6px}
+.btn-login:hover{background:#00e0c5}
+.btn-login:disabled{opacity:.5;cursor:not-allowed}
+.err-msg{background:rgba(240,64,64,.1);border:1px solid rgba(240,64,64,.2);color:var(--err);padding:10px 13px;border-radius:var(--r);font-size:13px;margin-top:14px;display:none}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:var(--r2);font-size:13px;font-weight:600;z-index:9999;transform:translateY(60px);opacity:0;transition:all .35s;max-width:340px;display:flex;align-items:center;gap:8px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:#14532d;color:#86efac;border:1px solid rgba(134,239,172,.2)}
+.toast.error{background:#7f1d1d;color:#fca5a5;border:1px solid rgba(252,165,165,.2)}
+.toast.info{background:#1e3a5f;color:#93c5fd;border:1px solid rgba(147,197,253,.2)}
+
+@media(max-width:700px){.sidebar{display:none}.stat-grid{grid-template-columns:1fr 1fr}.acb-info{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN STATE -->
+<div id="login-screen" style="display:flex;flex-direction:column;min-height:100vh">
+  <nav>
+    <div class="nav-brand">
+      <svg width="20" height="20" viewBox="0 0 48 48" fill="currentColor"><path d="M13.8 30.6C16.7 29.9 20.2 29.5 24 29.5s7.3.4 10.2 1.1c2.7.6 5.8 2.2 7.2 3.2L24.8 7.4a1 1 0 00-1.7 0L6.6 33.8c1.4-1 4.5-2.5 7.2-3.2z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M24 44c-5.1 0-9.9-.7-13.4-1.9-1.7-.6-3.3-1.4-4.5-2.4C4.9 38.7 4 37.4 4 35.7c0-.9.3-1.7.5-2.1L21 6.3a3 3 0 015.1 0l16.5 27.3c.2.3.6 1.1.6 2.1 0 1.7-.9 3-2.1 3.9-1.2 1-2.8 1.8-4.5 2.4C33.9 43.3 29.1 44 24 44zm12-15L24 9.8 12 29c.45-.16.9-.27 1.36-.37C16.43 27.9 20.1 27.5 24 27.5s7.57.4 10.64 1.13L36 29z"/></svg>
+      SwitchCash
+    </div>
+    <span class="agent-badge">Agent Portal</span>
+  </nav>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <svg width="44" height="44" viewBox="0 0 48 48" fill="var(--teal)"><path d="M13.8 30.6C16.7 29.9 20.2 29.5 24 29.5s7.3.4 10.2 1.1c2.7.6 5.8 2.2 7.2 3.2L24.8 7.4a1 1 0 00-1.7 0L6.6 33.8c1.4-1 4.5-2.5 7.2-3.2z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M24 44c-5.1 0-9.9-.7-13.4-1.9-1.7-.6-3.3-1.4-4.5-2.4C4.9 38.7 4 37.4 4 35.7c0-.9.3-1.7.5-2.1L21 6.3a3 3 0 015.1 0l16.5 27.3c.2.3.6 1.1.6 2.1 0 1.7-.9 3-2.1 3.9-1.2 1-2.8 1.8-4.5 2.4C33.9 43.3 29.1 44 24 44zm12-15L24 9.8 12 29c.45-.16.9-.27 1.36-.37C16.43 27.9 20.1 27.5 24 27.5s7.57.4 10.64 1.13L36 29z"/></svg>
+      </div>
+      <div class="login-title">Agent Sign In</div>
+      <div class="login-sub">Sign in to your SwitchCash agent account</div>
+      <div class="form-group">
+        <label class="form-label" for="l-email">Email</label>
+        <input class="form-input" type="email" id="l-email" placeholder="agent@example.com" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="l-pw">Password</label>
+        <input class="form-input" type="password" id="l-pw" placeholder="••••••••" autocomplete="current-password"/>
+      </div>
+      <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In</button>
+      <div class="err-msg" id="login-err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP STATE (hidden until logged in) -->
+<div id="app" style="display:none;flex-direction:column;min-height:100vh">
+  <nav>
+    <div class="nav-brand">
+      <svg width="20" height="20" viewBox="0 0 48 48" fill="currentColor"><path d="M13.8 30.6C16.7 29.9 20.2 29.5 24 29.5s7.3.4 10.2 1.1c2.7.6 5.8 2.2 7.2 3.2L24.8 7.4a1 1 0 00-1.7 0L6.6 33.8c1.4-1 4.5-2.5 7.2-3.2z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M24 44c-5.1 0-9.9-.7-13.4-1.9-1.7-.6-3.3-1.4-4.5-2.4C4.9 38.7 4 37.4 4 35.7c0-.9.3-1.7.5-2.1L21 6.3a3 3 0 015.1 0l16.5 27.3c.2.3.6 1.1.6 2.1 0 1.7-.9 3-2.1 3.9-1.2 1-2.8 1.8-4.5 2.4C33.9 43.3 29.1 44 24 44zm12-15L24 9.8 12 29c.45-.16.9-.27 1.36-.37C16.43 27.9 20.1 27.5 24 27.5s7.57.4 10.64 1.13L36 29z"/></svg>
+      SwitchCash <span style="margin-left:6px;opacity:.4;font-weight:400">·</span>
+      <span class="agent-badge" style="margin-left:6px">Agent</span>
+    </div>
+    <div class="nav-right">
+      <div class="online-dot"></div>
+      <span class="agent-name" id="nav-name">Agent</span>
+      <button class="btn-logout" onclick="doLogout()">Sign out</button>
+    </div>
+  </nav>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sb-item active" onclick="showTab('queue',this)">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        Transfer queue
+        <span class="sb-badge" id="queue-badge" style="display:none">0</span>
+      </div>
+      <div class="sb-item" onclick="showTab('history',this)">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        My history
+      </div>
+      <div class="sb-item" onclick="showTab('stats',this)">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-4"/></svg>
+        My stats
+      </div>
+    </aside>
+
+    <div class="page">
+
+      <!-- ── QUEUE TAB ── -->
+      <div id="tab-queue">
+        <!-- Active claim banner (shown when agent has a live claim) -->
+        <div class="active-claim-banner" id="active-claim-banner" style="display:none">
+          <div class="acb-top">
+            <span class="acb-title">You are processing a transfer</span>
+            <span class="acb-timer" id="acb-timer">5:00</span>
+          </div>
+          <div class="acb-info" id="acb-info"></div>
+          <button class="btn-complete" onclick="openCompleteModal()">Mark as complete + upload proof</button>
+        </div>
+
+        <div class="section-title">Available transfers</div>
+        <div class="transfer-list" id="transfer-list">
+          <div class="empty-state">
+            <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
+            <div>Loading transfers...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── HISTORY TAB ── -->
+      <div id="tab-history" style="display:none">
+        <div class="section-title">My transfer history</div>
+        <div style="overflow-x:auto">
+          <table class="hist-table">
+            <thead><tr>
+              <th>Date</th><th>Direction</th><th>Amount</th><th>Recipient</th><th>Status</th><th>Attempt</th>
+            </tr></thead>
+            <tbody id="history-body">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── STATS TAB ── -->
+      <div id="tab-stats" style="display:none">
+        <div class="section-title">My performance</div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-num teal" id="st-mc-nc">—</div><div class="stat-lbl">MonCash → NatCash</div></div>
+          <div class="stat-card"><div class="stat-num teal" id="st-nc-mc">—</div><div class="stat-lbl">NatCash → MonCash</div></div>
+          <div class="stat-card"><div class="stat-num" id="st-total">—</div><div class="stat-lbl">Total transfers</div></div>
+          <div class="stat-card"><div class="stat-num" id="st-volume">—</div><div class="stat-lbl">Volume processed (HTG)</div></div>
+        </div>
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+          <div class="stat-card"><div class="stat-num" id="st-online-since">—</div><div class="stat-lbl">Online since</div></div>
+          <div class="stat-card"><div class="stat-num" id="st-member-since">—</div><div class="stat-lbl">Member since</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- COMPLETE MODAL -->
+<div class="modal-overlay" id="complete-modal" style="display:none" onclick="if(event.target===this)closeCompleteModal()">
+  <div class="modal-box">
+    <div class="modal-title">Complete transfer</div>
+    <div class="form-group">
+      <label class="form-label">Proof of transfer</label>
+      <div class="proof-area" id="proof-drop" onclick="document.getElementById('proof-file').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" style="margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div style="font-size:13px;color:var(--muted)">Click or drag a photo here</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Screenshot of the completed transfer</div>
+        <img id="proof-preview" class="proof-preview" style="display:none"/>
+      </div>
+      <input type="file" id="proof-file" accept="image/*" style="display:none" onchange="handleFileSelect(this)"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes (optional)</label>
+      <textarea class="form-input form-textarea" id="proof-notes" placeholder="Any notes about this transfer..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel-modal" onclick="closeCompleteModal()">Cancel</button>
+      <button class="btn-submit-modal" id="submit-proof-btn" onclick="submitProof()">Submit & complete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let agentToken = localStorage.getItem('agent_token');
+let agentData  = null;
+let activeClaim = null;
+let claimTimerInterval = null;
+let refreshInterval = null;
+let pingInterval = null;
+let proofBlob = null;
+
+// ── INIT ────────────────────────────────────────────────────
+window.onload = async () => {
+  if (agentToken) {
+    try {
+      await loadStats();
+      showApp();
+      startPolling();
+    } catch {
+      localStorage.removeItem('agent_token');
+      agentToken = null;
+    }
+  }
+};
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+
+// ── LOGIN ────────────────────────────────────────────────────
+async function doLogin() {
+  const email    = document.getElementById('l-email').value.trim();
+  const password = document.getElementById('l-pw').value;
+  const btn      = document.getElementById('login-btn');
+  const err      = document.getElementById('login-err');
+  err.style.display = 'none';
+  if (!email || !password) { showErr('Email and password required'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const r = await fetch('/api/agent/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Login failed');
+    agentToken = d.token;
+    agentData  = d.agent;
+    localStorage.setItem('agent_token', agentToken);
+    document.getElementById('nav-name').textContent = d.agent.full_name.split(' ')[0];
+    showApp();
+    loadQueue();
+    loadStats();
+    startPolling();
+    toast('Signed in. Welcome, ' + d.agent.full_name.split(' ')[0] + '!', 'success');
+  } catch (e) {
+    showErr(e.message);
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
+});
+
+function showErr(msg) {
+  const el = document.getElementById('login-err');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+// ── LOGOUT ───────────────────────────────────────────────────
+async function doLogout() {
+  await fetch('/api/agent/logout', { method: 'POST', headers: agentHeaders() }).catch(() => {});
+  localStorage.removeItem('agent_token');
+  agentToken = null;
+  clearInterval(refreshInterval);
+  clearInterval(pingInterval);
+  clearInterval(claimTimerInterval);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// ── HEADERS ─────────────────────────────────────────────────
+function agentHeaders() {
+  return { 'Content-Type': 'application/json', 'x-agent-token': agentToken };
+}
+
+// ── POLLING ──────────────────────────────────────────────────
+function startPolling() {
+  loadQueue();
+  checkActiveClaim();
+  refreshInterval = setInterval(() => {
+    loadQueue();
+    checkActiveClaim();
+  }, 8000);
+  pingInterval = setInterval(() => {
+    fetch('/api/agent/ping', { method: 'POST', headers: agentHeaders() }).catch(() => {});
+  }, 30000);
+}
+
+// ── ACTIVE CLAIM ─────────────────────────────────────────────
+async function checkActiveClaim() {
+  try {
+    const r = await fetch('/api/agent/my-claim', { headers: agentHeaders() });
+    if (!r.ok) return;
+    const d = await r.json();
+    activeClaim = d.claim;
+    renderActiveClaim();
+  } catch {}
+}
+
+function renderActiveClaim() {
+  const banner = document.getElementById('active-claim-banner');
+  if (!activeClaim) { banner.style.display = 'none'; clearInterval(claimTimerInterval); return; }
+  banner.style.display = 'block';
+  const info = document.getElementById('acb-info');
+  const fmt  = (n) => Number(n).toLocaleString('fr-HT');
+  const dir  = activeClaim.direction === 'mc_to_nc' ? 'MonCash → NatCash' : 'NatCash → MonCash';
+  info.innerHTML = `
+    <div class="tx-row"><span class="tx-label">Amount</span><span class="tx-value" style="color:var(--white);font-size:18px;font-weight:700">${fmt(activeClaim.amount)} HTG</span></div>
+    <div class="tx-row"><span class="tx-label">Direction</span><span class="tx-value">${dir}</span></div>
+    <div class="tx-row"><span class="tx-label">Recipient phone</span><span class="tx-value" style="font-family:monospace">${activeClaim.recipient_phone}</span></div>
+    <div class="tx-row"><span class="tx-label">Sender name</span><span class="tx-value">${activeClaim.sender_name}</span></div>
+    <div class="tx-row"><span class="tx-label">Sender phone</span><span class="tx-value" style="font-family:monospace">${activeClaim.sender_phone}</span></div>
+    ${activeClaim.recipient_name ? `<div class="tx-row"><span class="tx-label">Recipient name</span><span class="tx-value">${activeClaim.recipient_name}</span></div>` : ''}
+  `;
+  clearInterval(claimTimerInterval);
+  claimTimerInterval = setInterval(() => updateClaimTimer(), 1000);
+  updateClaimTimer();
+}
+
+function updateClaimTimer() {
+  if (!activeClaim) return;
+  const el = document.getElementById('acb-timer');
+  const remaining = Math.max(0, new Date(activeClaim.expires_at) - Date.now());
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  el.textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+  el.className = 'acb-timer' + (remaining < 60000 ? ' urgent' : '');
+  if (remaining === 0) {
+    activeClaim = null;
+    renderActiveClaim();
+    toast('Claim expired. The transfer is back in the queue.', 'info');
+    loadQueue();
+  }
+}
+
+// ── TRANSFER QUEUE ───────────────────────────────────────────
+async function loadQueue() {
+  try {
+    const r = await fetch('/api/agent/transfers', { headers: agentHeaders() });
+    if (!r.ok) return;
+    const d = await r.json();
+    renderQueue(d.transfers || []);
+  } catch {}
+}
+
+function renderQueue(transfers) {
+  const list   = document.getElementById('transfer-list');
+  const badge  = document.getElementById('queue-badge');
+  const pending = transfers.filter(t => t.status === 'pending');
+
+  badge.textContent = pending.length;
+  badge.style.display = pending.length > 0 ? 'inline' : 'none';
+
+  if (transfers.length === 0) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+      <div style="font-weight:600;color:var(--text)">All clear!</div>
+      <div style="font-size:12px;margin-top:4px">No transfers waiting. Check back soon.</div>
+    </div>`;
+    return;
+  }
+
+  const fmt = (n) => Number(n).toLocaleString('fr-HT');
+  list.innerHTML = transfers.map(t => {
+    const isProcessing = t.status === 'processing';
+    const myActive     = !!t.my_active_claim_id;
+    const canClaim     = !activeClaim && !isProcessing;
+    const expired      = parseInt(t.agent_expired_count);
+    const dir          = t.direction === 'mc_to_nc';
+    const dirLabel     = dir ? 'MonCash → NatCash' : 'NatCash → MonCash';
+    const fee          = (t.amount * 0.05).toFixed(0);
+    const net          = (t.amount - fee).toFixed(0);
+    let attemptBadge   = '';
+    if (expired === 1) attemptBadge = '<span class="badge-attempt badge-1">1 attempt used</span>';
+    if (expired >= 2)  attemptBadge = '<span class="badge-attempt badge-2">Blocked — admin needed</span>';
+
+    let actionHtml = '';
+    if (myActive) {
+      const remaining = Math.max(0, new Date(t.claim_expires_at) - Date.now());
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      actionHtml = `<span class="countdown${remaining < 60000 ? ' urgent' : ''}">${mins}:${secs.toString().padStart(2,'0')} remaining</span>`;
+    } else if (isProcessing && !myActive) {
+      actionHtml = `<span style="font-size:12px;color:var(--muted)">Being processed by another agent</span>`;
+    } else if (canClaim) {
+      actionHtml = `<button class="btn-claim" onclick="claimTransfer('${t.id}')">Claim transfer</button>`;
+    } else if (activeClaim && !myActive) {
+      actionHtml = `<span style="font-size:12px;color:var(--muted)">Complete your active claim first</span>`;
+    }
+
+    return `<div class="tx-card${isProcessing && !myActive ? ' blocked' : ''}${myActive ? ' claimed' : ''}">
+      <div class="tx-top">
+        <div>
+          <div class="tx-amount">${fmt(t.amount)} <span style="font-size:14px;color:var(--muted)">HTG</span></div>
+          <div class="tx-fee">Fee: ${fmt(fee)} HTG · Net: ${fmt(net)} HTG</div>
+        </div>
+        <div class="tx-dir">
+          <span class="${dir ? 'dir-mc' : 'dir-nc'}">${dir ? 'MonCash' : 'NatCash'}</span>
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <span class="${dir ? 'dir-nc' : 'dir-mc'}">${dir ? 'NatCash' : 'MonCash'}</span>
+          ${attemptBadge}
+        </div>
+      </div>
+      <div class="tx-info">
+        <div class="tx-row"><span class="tx-label">Sender</span><span class="tx-value">${t.sender_name}</span></div>
+        <div class="tx-row"><span class="tx-label">Sender phone</span><span class="tx-value" style="font-family:monospace">${t.sender_phone}</span></div>
+        <div class="tx-row"><span class="tx-label">Recipient phone</span><span class="tx-value" style="font-family:monospace">${t.recipient_phone}</span></div>
+        ${t.recipient_name ? `<div class="tx-row"><span class="tx-label">Recipient name</span><span class="tx-value">${t.recipient_name}</span></div>` : ''}
+      </div>
+      <div class="tx-actions">${actionHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── CLAIM ────────────────────────────────────────────────────
+async function claimTransfer(txId) {
+  try {
+    const r = await fetch('/api/agent/claim', {
+      method: 'POST',
+      headers: agentHeaders(),
+      body: JSON.stringify({ transaction_id: txId }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not claim');
+    toast(`Transfer claimed! You have 5 minutes. Start now.`, 'success');
+    await checkActiveClaim();
+    await loadQueue();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+// ── COMPLETE MODAL ───────────────────────────────────────────
+function openCompleteModal() {
+  if (!activeClaim) return;
+  document.getElementById('complete-modal').style.display = 'flex';
+}
+function closeCompleteModal() {
+  document.getElementById('complete-modal').style.display = 'none';
+  proofBlob = null;
+  document.getElementById('proof-preview').style.display = 'none';
+  document.getElementById('proof-notes').value = '';
+}
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (file) { proofBlob = file; showPreview(file); }
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('proof-drop').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) { proofBlob = file; showPreview(file); }
+}
+function showPreview(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('proof-preview');
+    img.src = e.target.result; img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitProof() {
+  if (!proofBlob) { toast('Please upload a proof image', 'error'); return; }
+  if (!activeClaim) { toast('No active claim', 'error'); return; }
+
+  const btn = document.getElementById('submit-proof-btn');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+
+  try {
+    // Upload to Netlify Blobs via a simple base64 approach
+    const base64 = await fileToBase64(proofBlob);
+    const uploadRes = await fetch('/api/agent/upload-proof', {
+      method: 'POST',
+      headers: agentHeaders(),
+      body: JSON.stringify({ image_data: base64, mime_type: proofBlob.type }),
+    });
+    const uploadData = await uploadRes.json();
+    if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
+
+    const notes = document.getElementById('proof-notes').value;
+    const r = await fetch('/api/agent/complete', {
+      method: 'POST',
+      headers: agentHeaders(),
+      body: JSON.stringify({
+        claim_id:  activeClaim.id,
+        proof_url: uploadData.url,
+        notes,
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not complete');
+    closeCompleteModal();
+    activeClaim = null;
+    renderActiveClaim();
+    toast('Transfer completed! Great work.', 'success');
+    loadQueue();
+    loadStats();
+  } catch (e) {
+    toast(e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Submit & complete';
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = () => resolve(r.result.split(',')[1]);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+// ── HISTORY ──────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const r = await fetch('/api/agent/history', { headers: agentHeaders() });
+    const d = await r.json();
+    const tbody = document.getElementById('history-body');
+    if (!d.history?.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">No transfers yet</td></tr>';
+      return;
+    }
+    const fmt = (n) => Number(n).toLocaleString('fr-HT');
+    tbody.innerHTML = d.history.map(h => {
+      const dir = h.direction === 'mc_to_nc' ? 'MC → NC' : 'NC → MC';
+      const statusClass = h.status === 'completed' ? 's-completed' : h.status === 'expired' ? 's-expired' : 's-abandoned';
+      const date = new Date(h.claimed_at).toLocaleDateString('fr-HT', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      return `<tr>
+        <td style="color:var(--muted)">${date}</td>
+        <td>${dir}</td>
+        <td style="font-weight:600">${fmt(h.amount)} HTG</td>
+        <td style="font-family:monospace">${h.recipient_phone}</td>
+        <td><span class="status-pill ${statusClass}">${h.status}</span></td>
+        <td style="color:var(--muted)">#${h.attempt_number}</td>
+      </tr>`;
+    }).join('');
+  } catch {}
+}
+
+// ── STATS ────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const r = await fetch('/api/agent/stats', { headers: agentHeaders() });
+    if (!r.ok) throw new Error('Auth failed');
+    const d = await r.json();
+    const s = d.stats;
+    if (!agentData) {
+      // We got stats — agent is authenticated
+      const nav = document.getElementById('nav-name');
+      if (nav && s) nav.textContent = '';
+    }
+    const fmt = (n) => Number(n).toLocaleString('fr-HT');
+    const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setEl('st-mc-nc', s.transfers_mc_to_nc ?? 0);
+    setEl('st-nc-mc', s.transfers_nc_to_mc ?? 0);
+    setEl('st-total', (s.transfers_mc_to_nc ?? 0) + (s.transfers_nc_to_mc ?? 0));
+    setEl('st-volume', fmt(s.total_amount_processed ?? 0));
+    setEl('st-online-since', s.online_since ? new Date(s.online_since).toLocaleTimeString('fr-HT', { hour:'2-digit', minute:'2-digit' }) : '—');
+    setEl('st-member-since', s.created_at ? new Date(s.created_at).toLocaleDateString('fr-HT', { day:'2-digit', month:'long', year:'numeric' }) : '—');
+  } catch (e) {
+    throw e;
+  }
+}
+
+// ── TABS ─────────────────────────────────────────────────────
+function showTab(name, el) {
+  ['queue','history','stats'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t === name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  if (name === 'history') loadHistory();
+  if (name === 'stats')   loadStats();
+}
+
+// ── TOAST ────────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>
