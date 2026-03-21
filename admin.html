@@ -313,6 +313,12 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
       <span class="sb-count" id="sb-disputes-count" style="background:rgba(245,158,11,.18);color:#fbbf24;border-color:rgba(245,158,11,.3)">—</span>
     </button>
 
+    <button class="sb-link" onclick="nav('agents',this)" id="sb-agents">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/><path d="M16 11l2 2 4-4"/></svg>
+      Agents
+      <span class="sb-count" id="sb-agents-count">—</span>
+    </button>
+
     <div class="sb-section">Site Settings</div>
     <button class="sb-link" onclick="nav('site',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -531,6 +537,35 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
                 <button class="btn btn-ghost btn-sm" onclick="adminDisputeAction('reject')" style="color:var(--red);border-color:rgba(240,64,64,.25)">Reject</button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── AGENTS ── -->
+      <div class="section" id="sec-agents">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
+              Agent Management
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-primary btn-sm" onclick="openCreateAgent()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Agent
+              </button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <table class="tbl" id="agentTable">
+              <thead><tr>
+                <th>Agent</th><th>Phone</th><th>MonCash</th><th>NatCash</th>
+                <th>MC→NC</th><th>NC→MC</th><th>Online</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="agentTbody">
+                <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading…</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -786,6 +821,64 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
   </div>
 </div>
 
+<!-- CREATE AGENT MODAL -->
+<div class="modal-bg" id="createAgentModal">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-head">
+      <div class="modal-title">Create Agent</div>
+      <button class="modal-close" onclick="document.getElementById('createAgentModal').classList.remove('show')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="fg"><label>Full Name *</label><input type="text" id="ca-name" placeholder="Jean Pierre"/></div>
+        <div class="fg"><label>Email *</label><input type="email" id="ca-email" placeholder="agent@example.com"/></div>
+        <div class="fg"><label>Phone</label><input type="tel" id="ca-phone" placeholder="+509 XX XX XXXX"/></div>
+        <div class="fg"><label>Password *</label><input type="password" id="ca-password" placeholder="Min. 8 characters"/></div>
+        <div class="fg"><label>MonCash Phone</label><input type="tel" id="ca-moncash" placeholder="MonCash number"/></div>
+        <div class="fg"><label>NatCash Phone</label><input type="tel" id="ca-natcash" placeholder="NatCash number"/></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="document.getElementById('createAgentModal').classList.remove('show')">Cancel</button>
+      <button class="btn btn-primary" onclick="createAgent()">Create Agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT AGENT MODAL -->
+<div class="modal-bg" id="editAgentModal">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-head">
+      <div class="modal-title">Edit Agent</div>
+      <button class="modal-close" onclick="document.getElementById('editAgentModal').classList.remove('show')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ea-id"/>
+      <div class="form-grid">
+        <div class="fg"><label>Full Name</label><input type="text" id="ea-name"/></div>
+        <div class="fg"><label>Phone</label><input type="tel" id="ea-phone"/></div>
+        <div class="fg"><label>MonCash Phone</label><input type="tel" id="ea-moncash"/></div>
+        <div class="fg"><label>NatCash Phone</label><input type="tel" id="ea-natcash"/></div>
+        <div class="fg"><label>New Password</label><input type="password" id="ea-password" placeholder="Leave blank to keep current"/></div>
+        <div class="fg"><label>Status</label>
+          <select id="ea-suspended">
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="document.getElementById('editAgentModal').classList.remove('show')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditAgent()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST STACK -->
 <div class="toast-stack" id="toastStack"></div>
 
@@ -825,6 +918,7 @@ function nav(section, btn) {
   if (section === 'activity')     loadActivity();
   if (section === 'disputes')     loadAdminDisputes();
   if (section === 'overview')     loadOverview();
+  if (section === 'agents')       loadAgents();
 }
 
 // ── API HELPER ────────────────────────────────────────────────
