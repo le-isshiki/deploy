@@ -267,7 +267,7 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
             <input type="file" id="dep-file" accept="image/*" style="display:none" onchange="depFileSelect(this)"/>
           </div>
           <div id="dep-note" style="font-size:.78rem;color:var(--muted);padding:.75rem;background:rgba(0,201,177,.05);border:1px solid var(--border);border-radius:var(--r);margin-bottom:.75rem;line-height:1.6">
-            Send money to our <strong style="color:var(--text)">MonCash</strong> or <strong style="color:var(--text)">NatCash</strong> number, then upload the receipt here. An admin will credit your wallet within 15 minutes.
+            Send money to our <strong style="color:var(--text)">MonCash: +509 XX XX XXXX</strong> or <strong style="color:var(--text)">NatCash: +509 XX XX XXXX</strong>, enter the amount and your transaction reference number, then submit. An admin will credit your wallet within 15 minutes. Photo is optional.
           </div>
           <button class="btn-send" id="s3" onclick="submitDeposit()">
             <div class="spin" id="sp3"></div>
@@ -743,7 +743,6 @@ async function submitDeposit() {
   const ref    = document.getElementById('dep-ref').value.trim();
 
   if (!amount || amount < 100) { toast('Minimum deposit is 100 HTG.', 'error'); return; }
-  if (!depFileBlob)            { toast('Please upload a receipt photo.', 'error'); return; }
 
   const btn = document.getElementById('s3');
   btn.classList.add('ld');
