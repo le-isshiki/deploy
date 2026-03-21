@@ -307,6 +307,11 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
       Transactions
       <span class="sb-count red">2</span>
     </button>
+    <button class="sb-link" onclick="nav('deposits',this)" id="sb-deposits">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Deposits
+      <span class="sb-count red" id="sb-deposits-count">—</span>
+    </button>
     <button class="sb-link" onclick="nav('disputes',this)" id="sb-disputes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       Disputes
@@ -543,6 +548,55 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
                 </button>
                 <button class="btn btn-ghost btn-sm" onclick="adminDisputeAction('reject')" style="color:var(--red);border-color:rgba(240,64,64,.25)">Reject</button>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── DEPOSITS ── -->
+      <div class="section" id="sec-deposits">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              Deposit Requests
+            </div>
+            <div class="card-actions">
+              <select id="dep-filter" style="padding:.42rem .8rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--r);font-family:inherit;font-size:.8rem;color:var(--text);outline:none" onchange="loadDeposits()">
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="rejected">Rejected</option>
+                <option value="all">All</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="loadDeposits()">Refresh</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <table class="tbl">
+              <thead><tr>
+                <th>User</th><th>Wallet</th><th>Amount</th><th>Reference</th><th>Submitted</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="depositTbody">
+                <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Deposit Detail Modal -->
+        <div class="modal-bg" id="depositDetailModal">
+          <div class="modal" style="max-width:560px">
+            <div class="modal-head">
+              <div class="modal-title">Deposit Request</div>
+              <button class="modal-close" onclick="document.getElementById('depositDetailModal').classList.remove('show')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="modal-body" id="depositDetailBody"></div>
+            <div class="modal-foot">
+              <button class="btn btn-ghost" onclick="document.getElementById('depositDetailModal').classList.remove('show')">Close</button>
+              <button class="btn btn-danger btn-sm" id="dep-reject-btn" onclick="processDeposit('rejected')">Reject</button>
+              <button class="btn btn-primary" id="dep-confirm-btn" onclick="processDeposit('confirmed')">✓ Confirm &amp; Credit Wallet</button>
             </div>
           </div>
         </div>
@@ -926,6 +980,7 @@ function nav(section, btn) {
   if (section === 'disputes')     loadAdminDisputes();
   if (section === 'overview')     loadOverview();
   if (section === 'agents')       loadAgents();
+  if (section === 'deposits')     loadDeposits();
 }
 
 // ── API HELPER ────────────────────────────────────────────────
@@ -1031,6 +1086,7 @@ async function logout() {
 function initApp() {
   loadOverview();
   loadDisputesBadge();
+  loadDepositsBadge();
 }
 
 // ── OVERVIEW ─────────────────────────────────────────────────
@@ -1488,6 +1544,112 @@ async function toggleAgentSuspend(id, suspend) {
     showToast(suspend ? 'Agent suspended.' : 'Agent unsuspended.', 'success');
     loadAgents();
   } catch(err) { showToast(err.message, 'error'); }
+}
+
+// ── DEPOSITS ──────────────────────────────────────────────────
+let _currentDepositId = null;
+
+async function loadDeposits() {
+  const tbody  = document.getElementById('depositTbody');
+  if (!tbody) return;
+  const status = document.getElementById('dep-filter')?.value || 'pending';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">Loading…</td></tr>';
+  try {
+    const data = await adminFetch('deposits?status=' + status);
+    const deposits = data.deposits || [];
+
+    // Update sidebar badge
+    if (status === 'pending') {
+      const badge = document.getElementById('sb-deposits-count');
+      if (badge) badge.textContent = deposits.length || '0';
+    }
+
+    if (!deposits.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">No ' + status + ' deposits.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = deposits.map(function(d) {
+      const sc = d.status === 'confirmed' ? 'done' : d.status === 'rejected' ? 'fail' : 'pend';
+      const walletLabel = (d.wallet_type || '').toUpperCase();
+      return '<tr>' +
+        '<td><div style="font-weight:600;color:var(--text)">' + (d.full_name||'—') + '</div>' +
+        '<div style="font-size:.74rem;color:var(--muted)">' + (d.email||'—') + '</div></td>' +
+        '<td><span style="font-weight:700;color:var(--teal)">' + walletLabel + '</span></td>' +
+        '<td style="font-weight:600">' + fmtHTG(d.amount) + '</td>' +
+        '<td style="color:var(--muted);font-size:.78rem">' + (d.reference||'—') + '</td>' +
+        '<td style="color:var(--muted)">' + fmtDate(d.created_at) + '</td>' +
+        '<td><span class="status-dot ' + sc + '">' + (d.status||'pending') + '</span></td>' +
+        '<td>' + (d.status === 'pending'
+          ? '<button class="btn btn-primary btn-sm" onclick="openDepositDetail(\'' + d.id + '\')">Review</button>'
+          : '<button class="btn btn-ghost btn-sm" onclick="openDepositDetail(\'' + d.id + '\')">View</button>') +
+        '</td></tr>';
+    }).join('');
+  } catch(err) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:2rem">' + err.message + '</td></tr>';
+    showToast(err.message, 'error');
+  }
+}
+
+let _deposits = [];
+async function openDepositDetail(id) {
+  _currentDepositId = id;
+  // Load fresh list to get full data
+  try {
+    const status = document.getElementById('dep-filter')?.value || 'all';
+    const data = await adminFetch('deposits?status=all');
+    _deposits = data.deposits || [];
+    const d = _deposits.find(function(x){ return x.id === id; });
+    if (!d) { showToast('Deposit not found', 'error'); return; }
+
+    const isPending = d.status === 'pending';
+    const body = document.getElementById('depositDetailBody');
+    const hasImage = d.image_url && d.image_url.startsWith('data:');
+    body.innerHTML =
+      '<div style="display:grid;gap:.6rem;font-size:.83rem;margin-bottom:1rem">' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">User</span><span style="font-weight:600">' + (d.full_name||'—') + ' (' + (d.email||'—') + ')</span></div>' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Phone</span><span>' + (d.phone||'—') + '</span></div>' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Wallet</span><span style="font-weight:700;color:var(--teal)">' + (d.wallet_type||'').toUpperCase() + '</span></div>' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Amount</span><span style="font-weight:700;font-size:1rem;color:var(--white)">' + fmtHTG(d.amount) + '</span></div>' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Reference</span><span style="font-family:monospace">' + (d.reference||'Not provided') + '</span></div>' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Submitted</span><span>' + fmtDate(d.created_at) + '</span></div>' +
+        '<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Status</span><span>' + (d.status||'pending') + '</span></div>' +
+      '</div>' +
+      (hasImage ? '<img src="' + d.image_url + '" style="width:100%;border-radius:var(--r);border:1px solid var(--border);max-height:280px;object-fit:contain;background:#000"/>' : '<div style="padding:1rem;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--r);text-align:center;color:var(--muted);font-size:.82rem">No receipt image uploaded</div>');
+
+    document.getElementById('dep-confirm-btn').style.display = isPending ? '' : 'none';
+    document.getElementById('dep-reject-btn').style.display  = isPending ? '' : 'none';
+    document.getElementById('depositDetailModal').classList.add('show');
+  } catch(err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function processDeposit(action) {
+  if (!_currentDepositId) return;
+  try {
+    await adminFetch('deposits/' + _currentDepositId, {
+      method: 'PUT',
+      body: JSON.stringify({ status: action, notes: adminUser || 'admin' })
+    });
+    showToast(action === 'confirmed' ? 'Deposit confirmed! Wallet credited.' : 'Deposit rejected.', action === 'confirmed' ? 'success' : 'warning');
+    document.getElementById('depositDetailModal').classList.remove('show');
+    _currentDepositId = null;
+    loadDeposits();
+    loadOverview(); // refresh stats
+  } catch(err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// Load deposit badge on init
+async function loadDepositsBadge() {
+  try {
+    const data = await adminFetch('deposits?status=pending');
+    const n = (data.deposits || []).length;
+    const badge = document.getElementById('sb-deposits-count');
+    if (badge) badge.textContent = n || '0';
+  } catch {}
 }
 
 // ── CHANGE PASSWORD ───────────────────────────────────────────
