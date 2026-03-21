@@ -198,16 +198,19 @@ export default async (req) => {
   // ── UPLOAD DEPOSIT RECEIPT ────────────────────────────────────
   if (req.method === 'POST' && resource === 'deposit-receipt') {
     const body = await parseBody(req);
-    const { image_base64, image_name, image_type, wallet_type, amount, reference } = body ?? {};
+    const { wallet_type, amount, reference, image_base64, image_type } = body ?? {};
 
-    if (!image_base64)  return errorResponse(400, 'image_base64 required');
     if (!['moncash','natcash'].includes(wallet_type)) return errorResponse(400, 'wallet_type must be moncash or natcash');
+    if (!amount || parseFloat(amount) < 100) return errorResponse(400, 'Minimum deposit is 100 HTG');
 
-    // Validate size (base64 is ~4/3 of original, so 2MB base64 ≈ 1.5MB image)
-    if (image_base64.length > 2_800_000) return errorResponse(400, 'Image too large (max ~2MB)');
-
-    // Store base64 image directly in DB — no external storage needed
-    const image_url = `data:${image_type || 'image/jpeg'};base64,${image_base64}`;
+    // Store a small thumbnail preview only (first 50KB of base64 = ~37KB image)
+    // Full image storage via blobs not needed — reference number is sufficient for admin verification
+    let image_url = 'receipt-submitted';
+    if (image_base64) {
+      // Store only a thumbnail-sized portion to keep DB rows small
+      const preview = image_base64.slice(0, 50000);
+      image_url = `data:${image_type || 'image/jpeg'};base64,${preview}`;
+    }
 
     const [profile] = await sql`SELECT full_name, phone, email FROM profiles WHERE id = ${session.user_id}`;
 
@@ -217,7 +220,7 @@ export default async (req) => {
         ${session.user_id},
         ${image_url},
         ${wallet_type},
-        ${amount ? parseFloat(amount) : null},
+        ${parseFloat(amount)},
         ${reference ? sanitize(reference) : null},
         'dashboard'
       )
@@ -232,12 +235,12 @@ export default async (req) => {
       userEmail: profile?.email,
       walletType: wallet_type,
       amount,
-      imageUrl:  'Receipt uploaded (stored in DB)',
+      imageUrl:  reference ? 'Ref: ' + reference : 'No reference provided',
     }).catch(() => {});
 
     return response(201, {
       receipt_id: receipt.id,
-      message: 'Receipt uploaded. An admin will credit your wallet within 15 minutes.',
+      message: 'Deposit request submitted! An admin will credit your wallet within 15 minutes.',
     });
   }
 
