@@ -115,17 +115,26 @@ export default async (req) => {
     const limit  = Math.min(parseInt(url.searchParams.get('limit') ?? '50'), 200);
     const offset = parseInt(url.searchParams.get('offset') ?? '0');
     const search = url.searchParams.get('search') ?? '';
-    const users  = await sql`
-      SELECT p.id, p.email, p.full_name, p.phone, p.country, p.kyc_status,
-             p.created_at, p.is_suspended, p.email_verified,
-             COALESCE(w.balance, 0) AS balance, COUNT(DISTINCT t.id) AS transaction_count
-      FROM profiles p
-      LEFT JOIN wallets w      ON w.user_id = p.id AND w.currency = 'HTG'
-      LEFT JOIN transactions t ON t.sender_id = p.id OR t.receiver_id = p.id
-      WHERE ${search ? sql`(p.email ILIKE ${'%'+search+'%'} OR p.full_name ILIKE ${'%'+search+'%'} OR p.phone ILIKE ${'%'+search+'%'})` : sql`TRUE`}
-      GROUP BY p.id, w.balance
-      ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}
-    `;
+    const users = search
+      ? await sql`
+          SELECT p.id, p.email, p.full_name, p.phone, p.country, p.kyc_status,
+                 p.created_at, p.is_suspended, p.email_verified,
+                 COALESCE(w.balance, 0) AS balance, COUNT(DISTINCT t.id) AS transfer_count
+          FROM profiles p
+          LEFT JOIN wallets w      ON w.user_id = p.id AND w.currency = 'HTG'
+          LEFT JOIN transactions t ON t.sender_id = p.id OR t.receiver_id = p.id
+          WHERE (p.email ILIKE ${'%'+search+'%'} OR p.full_name ILIKE ${'%'+search+'%'} OR p.phone ILIKE ${'%'+search+'%'})
+          GROUP BY p.id, w.balance
+          ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+      : await sql`
+          SELECT p.id, p.email, p.full_name, p.phone, p.country, p.kyc_status,
+                 p.created_at, p.is_suspended, p.email_verified,
+                 COALESCE(w.balance, 0) AS balance, COUNT(DISTINCT t.id) AS transfer_count
+          FROM profiles p
+          LEFT JOIN wallets w      ON w.user_id = p.id AND w.currency = 'HTG'
+          LEFT JOIN transactions t ON t.sender_id = p.id OR t.receiver_id = p.id
+          GROUP BY p.id, w.balance
+          ORDER BY p.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
     const [{ count }] = await sql`SELECT COUNT(*) FROM profiles`;
     return response(200, { users, total: parseInt(count) });
   }
@@ -136,21 +145,53 @@ export default async (req) => {
     if (!body) return errorResponse(400, 'Invalid request');
     const updates = {};
     if (body.kyc_status !== undefined) {
-      if (!['pending','verified','rejected'].includes(body.kyc_status)) return errorResponse(400, 'Invalid KYC status');
+      if (!['pending','verified','rejected','submitted'].includes(body.kyc_status)) return errorResponse(400, 'Invalid KYC status');
       updates.kyc_status = body.kyc_status;
     }
-    if (body.is_suspended !== undefined)    updates.is_suspended = !!body.is_suspended;
+    // admin.html sends status:'suspended'/'active' — map to is_suspended
+    if (body.status !== undefined) updates.is_suspended = body.status === 'suspended';
+    if (body.is_suspended !== undefined) updates.is_suspended = !!body.is_suspended;
     if (body.suspension_reason !== undefined) updates.suspension_reason = sanitize(body.suspension_reason);
+    // full_name and phone updates from admin.html
+    if (body.full_name !== undefined) updates.full_name = sanitize(body.full_name);
+    if (body.phone !== undefined)     updates.phone = sanitize(body.phone);
     const [updated] = await sql`
       UPDATE profiles SET
-        kyc_status        = COALESCE(${updates.kyc_status        ?? null}, kyc_status),
-        is_suspended      = COALESCE(${updates.is_suspended      ?? null}, is_suspended),
-        suspension_reason = COALESCE(${updates.suspension_reason ?? null}, suspension_reason)
-      WHERE id = ${subId} RETURNING id, email, kyc_status, is_suspended
+        kyc_status        = COALESCE(${updates.kyc_status   ?? null}, kyc_status),
+        is_suspended      = COALESCE(${updates.is_suspended ?? null}, is_suspended),
+        suspension_reason = COALESCE(${updates.suspension_reason ?? null}, suspension_reason),
+        full_name         = COALESCE(${updates.full_name ?? null}, full_name),
+        phone             = COALESCE(${updates.phone     ?? null}, phone)
+      WHERE id = ${subId} RETURNING id, email, full_name, phone, kyc_status, is_suspended
     `;
     if (!updated) return errorResponse(404, 'User not found');
     await auditLog(sql, adminUser, 'update_user', 'profile', subId, updates, ip);
     return response(200, { user: updated });
+  }
+
+  // ── CREATE USER ────────────────────────────────────────────
+  if (req.method === 'POST' && resource === 'users') {
+    const body = await parseBody(req);
+    if (!body) return errorResponse(400, 'Invalid request');
+    const { full_name, email, phone, status } = body;
+    if (!full_name || !email) return errorResponse(400, 'full_name and email required');
+    const is_suspended = status === 'suspended';
+    // Generate a random temp password hash
+    const tempHash = await bcrypt.hash('TempPass' + Date.now(), 10);
+    try {
+      const [user] = await sql`
+        INSERT INTO profiles (email, password_hash, full_name, phone, is_suspended)
+        VALUES (${sanitize(email).toLowerCase()}, ${tempHash}, ${sanitize(full_name)},
+                ${phone ? sanitize(phone) : null}, ${is_suspended})
+        RETURNING id, email, full_name
+      `;
+      await sql`INSERT INTO wallets (user_id, currency, balance) VALUES (${user.id}, 'HTG', 0.00) ON CONFLICT DO NOTHING`;
+      await auditLog(sql, adminUser, 'create_user', 'profile', user.id, { email: user.email }, ip);
+      return response(201, { user, message: 'User created. They will need to reset their password.' });
+    } catch(err) {
+      if (err.message?.includes('unique')) return errorResponse(409, 'Email already exists');
+      return errorResponse(500, 'Could not create user: ' + err.message);
+    }
   }
 
   // ── CREDIT WALLET ──────────────────────────────────────────
@@ -200,16 +241,35 @@ export default async (req) => {
     const offset = parseInt(url.searchParams.get('offset') ?? '0');
     const search = url.searchParams.get('search') ?? '';
     const status = url.searchParams.get('status') ?? '';
-    const transactions = await sql`
-      SELECT t.*, s.email AS sender_email, s.full_name AS sender_name,
-             r.email AS receiver_email, r.full_name AS receiver_name
-      FROM transactions t
-      LEFT JOIN profiles s ON s.id = t.sender_id
-      LEFT JOIN profiles r ON r.id = t.receiver_id
-      WHERE ${search ? sql`(s.email ILIKE ${'%'+search+'%'} OR t.reference ILIKE ${'%'+search+'%'})` : sql`TRUE`}
-        AND ${status ? sql`t.status = ${status}` : sql`TRUE`}
-      ORDER BY t.created_at DESC LIMIT ${limit} OFFSET ${offset}
-    `;
+    let transactions;
+    if (search && status) {
+      transactions = await sql`
+        SELECT t.*, s.email AS sender_email, s.full_name AS sender_name,
+               r.email AS receiver_email, r.full_name AS receiver_name
+        FROM transactions t LEFT JOIN profiles s ON s.id = t.sender_id LEFT JOIN profiles r ON r.id = t.receiver_id
+        WHERE (s.email ILIKE ${'%'+search+'%'} OR t.reference ILIKE ${'%'+search+'%'}) AND t.status = ${status}
+        ORDER BY t.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+    } else if (search) {
+      transactions = await sql`
+        SELECT t.*, s.email AS sender_email, s.full_name AS sender_name,
+               r.email AS receiver_email, r.full_name AS receiver_name
+        FROM transactions t LEFT JOIN profiles s ON s.id = t.sender_id LEFT JOIN profiles r ON r.id = t.receiver_id
+        WHERE (s.email ILIKE ${'%'+search+'%'} OR t.reference ILIKE ${'%'+search+'%'})
+        ORDER BY t.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+    } else if (status) {
+      transactions = await sql`
+        SELECT t.*, s.email AS sender_email, s.full_name AS sender_name,
+               r.email AS receiver_email, r.full_name AS receiver_name
+        FROM transactions t LEFT JOIN profiles s ON s.id = t.sender_id LEFT JOIN profiles r ON r.id = t.receiver_id
+        WHERE t.status = ${status}
+        ORDER BY t.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+    } else {
+      transactions = await sql`
+        SELECT t.*, s.email AS sender_email, s.full_name AS sender_name,
+               r.email AS receiver_email, r.full_name AS receiver_name
+        FROM transactions t LEFT JOIN profiles s ON s.id = t.sender_id LEFT JOIN profiles r ON r.id = t.receiver_id
+        ORDER BY t.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+    }
     const [{ count }] = await sql`SELECT COUNT(*) FROM transactions`;
     return response(200, { transactions, total: parseInt(count) });
   }
@@ -217,12 +277,9 @@ export default async (req) => {
   // ── DEPOSITS ───────────────────────────────────────────────
   if (req.method === 'GET' && resource === 'deposits') {
     const status = url.searchParams.get('status') ?? 'pending';
-    const deposits = await sql`
-      SELECT d.*, p.email, p.full_name, p.phone FROM deposit_requests d
-      JOIN profiles p ON p.id = d.user_id
-      WHERE ${status !== 'all' ? sql`d.status = ${status}` : sql`TRUE`}
-      ORDER BY d.created_at DESC LIMIT 100
-    `;
+    const deposits = status !== 'all'
+      ? await sql`SELECT d.*, p.email, p.full_name, p.phone FROM deposit_requests d JOIN profiles p ON p.id = d.user_id WHERE d.status = ${status} ORDER BY d.created_at DESC LIMIT 100`
+      : await sql`SELECT d.*, p.email, p.full_name, p.phone FROM deposit_requests d JOIN profiles p ON p.id = d.user_id ORDER BY d.created_at DESC LIMIT 100`;
     return response(200, { deposits });
   }
 
@@ -255,12 +312,9 @@ export default async (req) => {
   // ── WITHDRAWALS ────────────────────────────────────────────
   if (req.method === 'GET' && resource === 'withdrawals') {
     const status = url.searchParams.get('status') ?? 'pending';
-    const withdrawals = await sql`
-      SELECT w.*, p.email, p.full_name FROM withdrawal_requests w
-      JOIN profiles p ON p.id = w.user_id
-      WHERE ${status !== 'all' ? sql`w.status = ${status}` : sql`TRUE`}
-      ORDER BY w.created_at DESC LIMIT 100
-    `;
+    const withdrawals = status !== 'all'
+      ? await sql`SELECT w.*, p.email, p.full_name FROM withdrawal_requests w JOIN profiles p ON p.id = w.user_id WHERE w.status = ${status} ORDER BY w.created_at DESC LIMIT 100`
+      : await sql`SELECT w.*, p.email, p.full_name FROM withdrawal_requests w JOIN profiles p ON p.id = w.user_id ORDER BY w.created_at DESC LIMIT 100`;
     return response(200, { withdrawals });
   }
 
@@ -364,6 +418,8 @@ export default async (req) => {
     if (body.is_active !== undefined)         updates.is_active = !!body.is_active;
     if (body.moncash_phone !== undefined)     updates.moncash_phone = sanitize(body.moncash_phone);
     if (body.natcash_phone !== undefined)     updates.natcash_phone = sanitize(body.natcash_phone);
+    if (body.full_name !== undefined)         updates.full_name = sanitize(body.full_name);
+    if (body.phone !== undefined)             updates.phone = sanitize(body.phone);
     if (body.password) {
       if (body.password.length < 8) return errorResponse(400, 'Password must be at least 8 characters');
       updates.password_hash = await bcrypt.hash(body.password, 12);
@@ -375,7 +431,9 @@ export default async (req) => {
         is_active         = COALESCE(${updates.is_active         ?? null}, is_active),
         moncash_phone     = COALESCE(${updates.moncash_phone     ?? null}, moncash_phone),
         natcash_phone     = COALESCE(${updates.natcash_phone     ?? null}, natcash_phone),
-        password_hash     = COALESCE(${updates.password_hash     ?? null}, password_hash)
+        password_hash     = COALESCE(${updates.password_hash     ?? null}, password_hash),
+        full_name         = COALESCE(${updates.full_name         ?? null}, full_name),
+        phone             = COALESCE(${updates.phone             ?? null}, phone)
       WHERE id = ${subId}
       RETURNING id, email, full_name, is_active, is_suspended
     `;
