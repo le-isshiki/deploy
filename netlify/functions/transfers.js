@@ -1,7 +1,7 @@
 // v2 — rebuilt 2026-03-20
 // netlify/functions/transfers.js
 import { getDb, getDbDirect, getSession, response, errorResponse, parseBody, sanitize } from './_utils/db.js';
-import { sendTransferEmail } from './_utils/email.js';
+import { sendTransferEmail, sendDepositReceiptEmail } from './_utils/email.js';
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return response(200, {});
@@ -203,20 +203,11 @@ export default async (req) => {
     if (!image_base64)  return errorResponse(400, 'image_base64 required');
     if (!['moncash','natcash'].includes(wallet_type)) return errorResponse(400, 'wallet_type must be moncash or natcash');
 
-    // Upload image to Netlify Blobs
-    let image_url = null;
-    try {
-      const { getStore } = await import('@netlify/blobs');
-      const store  = getStore('deposit-receipts');
-      const fileId = `deposit-${session.user_id}-${Date.now()}`;
-      const buffer = Buffer.from(image_base64, 'base64');
-      if (buffer.length > 5 * 1024 * 1024) return errorResponse(400, 'Image too large (max 5MB)');
-      await store.set(fileId, buffer, { metadata: { contentType: image_type || 'image/jpeg' } });
-      image_url = `/.netlify/blobs/${fileId}`;
-    } catch (err) {
-      console.error('Blob upload error:', err.message);
-      return errorResponse(500, 'Image upload failed. Please try again.');
-    }
+    // Validate size (base64 is ~4/3 of original, so 2MB base64 ≈ 1.5MB image)
+    if (image_base64.length > 2_800_000) return errorResponse(400, 'Image too large (max ~2MB)');
+
+    // Store base64 image directly in DB — no external storage needed
+    const image_url = `data:${image_type || 'image/jpeg'};base64,${image_base64}`;
 
     const [profile] = await sql`SELECT full_name, phone, email FROM profiles WHERE id = ${session.user_id}`;
 
@@ -224,7 +215,7 @@ export default async (req) => {
       INSERT INTO deposit_receipts (user_id, image_url, wallet_type, amount, reference, upload_method)
       VALUES (
         ${session.user_id},
-        ${sanitize(image_url, 500)},
+        ${image_url},
         ${wallet_type},
         ${amount ? parseFloat(amount) : null},
         ${reference ? sanitize(reference) : null},
@@ -235,17 +226,14 @@ export default async (req) => {
 
     await sql`UPDATE deposit_receipts SET notified_admin_at=NOW() WHERE id=${receipt.id}`;
 
-    const { sendDepositReceiptEmail } = await import('./_utils/email.js').catch(() => ({}));
-    if (sendDepositReceiptEmail) {
-      sendDepositReceiptEmail({
-        userName:  profile?.full_name,
-        userPhone: profile?.phone,
-        userEmail: profile?.email,
-        walletType: wallet_type,
-        amount,
-        imageUrl:  image_url,
-      }).catch(() => {});
-    }
+    sendDepositReceiptEmail({
+      userName:  profile?.full_name,
+      userPhone: profile?.phone,
+      userEmail: profile?.email,
+      walletType: wallet_type,
+      amount,
+      imageUrl:  'Receipt uploaded (stored in DB)',
+    }).catch(() => {});
 
     return response(201, {
       receipt_id: receipt.id,
