@@ -1381,7 +1381,8 @@ let _agents = [];
 
 async function loadAgents() {
   const tbody = document.getElementById('agentTbody');
-  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading…</td></tr>';
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading\u2026</td></tr>';
   try {
     const data = await adminFetch('agents');
     _agents = data.agents || [];
@@ -1389,88 +1390,90 @@ async function loadAgents() {
     if (badge) badge.textContent = _agents.length;
     renderAgents(_agents);
   } catch(err) {
-    const msg = err.message || 'Unknown error';
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:2rem">⚠ ' + msg + '</td></tr>';
-    showToast('Agents error: ' + msg, 'error');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:2rem">Error: ' + (err.message||'failed') + '</td></tr>';
+    showToast(err.message || 'Failed to load agents', 'error');
   }
 }
 
 function renderAgents(agents) {
   const tbody = document.getElementById('agentTbody');
+  if (!tbody) return;
   if (!agents.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">No agents yet. Click “Add Agent” to create one.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">No agents yet. Click &quot;+ Add Agent&quot; to create one.</td></tr>';
     return;
   }
-  tbody.innerHTML = agents.map(a => {
-    const online = a.is_online;
-    const sc = a.is_suspended ? 'fail' : online ? 'done' : 'pend';
-    const sl = a.is_suspended ? 'Suspended' : online ? 'Online' : 'Offline';
+  tbody.innerHTML = agents.map(function(a) {
+    const sc = a.is_suspended ? 'fail' : (a.is_online ? 'done' : 'pend');
+    const sl = a.is_suspended ? 'Suspended' : (a.is_online ? 'Online' : 'Offline');
+    const editBtn = '<button class="btn btn-ghost btn-sm" onclick="openEditAgent(\'' + a.id + '\')">Edit</button>';
+    const suspBtn = a.is_suspended
+      ? '<button class="btn btn-outline btn-sm" onclick="toggleAgentSuspend(\'' + a.id + '\',false)">Unsuspend</button>'
+      : '<button class="btn btn-danger btn-sm" onclick="toggleAgentSuspend(\'' + a.id + '\',true)">Suspend</button>';
     return '<tr>' +
-      '<td><div style="font-weight:600;color:var(--text)">' + (a.full_name||'—') + '</div>' +
-      '<div style="font-size:.74rem;color:var(--muted)">' + (a.email||'—') + '</div></td>' +
-      '<td style="color:var(--muted)">' + (a.phone||'—') + '</td>' +
-      '<td style="font-family:monospace;font-size:.78rem">' + (a.moncash_phone||'—') + '</td>' +
-      '<td style="font-family:monospace;font-size:.78rem">' + (a.natcash_phone||'—') + '</td>' +
+      '<td><div style="font-weight:600;color:var(--text)">' + (a.full_name||'\u2014') + '</div>' +
+      '<div style="font-size:.74rem;color:var(--muted)">' + (a.email||'\u2014') + '</div></td>' +
+      '<td style="color:var(--muted)">' + (a.phone||'\u2014') + '</td>' +
+      '<td style="font-family:monospace;font-size:.78rem">' + (a.moncash_phone||'\u2014') + '</td>' +
+      '<td style="font-family:monospace;font-size:.78rem">' + (a.natcash_phone||'\u2014') + '</td>' +
       '<td style="color:var(--teal);font-weight:600">' + (a.transfers_mc_to_nc||0) + '</td>' +
       '<td style="color:var(--teal);font-weight:600">' + (a.transfers_nc_to_mc||0) + '</td>' +
       '<td><span class="status-dot ' + sc + '">' + sl + '</span></td>' +
-      '<td><span class="status-dot ' + (a.is_suspended?'fail':'done') + '">' + (a.is_suspended?'Suspended':'Active') + '</span></td>' +
-      '<td style="display:flex;gap:.4rem;flex-wrap:wrap">' +
-        '<button class="btn btn-ghost btn-sm" onclick="openEditAgent('' + a.id + '')">Edit</button>' +
-        (a.is_suspended
-          ? '<button class="btn btn-outline btn-sm" onclick="toggleAgentSuspend('' + a.id + '', false)">Unsuspend</button>'
-          : '<button class="btn btn-danger btn-sm" onclick="toggleAgentSuspend('' + a.id + '', true)">Suspend</button>') +
-      '</td>' +
-    '</tr>';
+      '<td><span class="status-dot ' + (a.is_suspended ? 'fail' : 'done') + '">' + (a.is_suspended ? 'Suspended' : 'Active') + '</span></td>' +
+      '<td style="display:flex;gap:.4rem">' + editBtn + suspBtn + '</td>' +
+      '</tr>';
   }).join('');
 }
 
 function openCreateAgent() {
-  ['ca-name','ca-email','ca-phone','ca-password','ca-moncash','ca-natcash'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
+  ['ca-name','ca-email','ca-phone','ca-password','ca-moncash','ca-natcash'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
   });
   document.getElementById('createAgentModal').classList.add('show');
 }
 
 async function createAgent() {
-  const full_name     = document.getElementById('ca-name').value.trim();
-  const email         = document.getElementById('ca-email').value.trim();
-  const phone         = document.getElementById('ca-phone').value.trim();
-  const password      = document.getElementById('ca-password').value;
-  const moncash_phone = document.getElementById('ca-moncash').value.trim();
-  const natcash_phone = document.getElementById('ca-natcash').value.trim();
-  if (!full_name || !email || !password) { showToast('Name, email and password required.', 'warning'); return; }
+  var full_name     = document.getElementById('ca-name').value.trim();
+  var email         = document.getElementById('ca-email').value.trim();
+  var phone         = document.getElementById('ca-phone').value.trim();
+  var password      = document.getElementById('ca-password').value;
+  var moncash_phone = document.getElementById('ca-moncash').value.trim();
+  var natcash_phone = document.getElementById('ca-natcash').value.trim();
+  if (!full_name || !email || !password) { showToast('Name, email and password are required.', 'warning'); return; }
   if (password.length < 8) { showToast('Password must be at least 8 characters.', 'warning'); return; }
   try {
     await adminFetch('agents', { method: 'POST', body: JSON.stringify({ full_name, email, phone, password, moncash_phone, natcash_phone }) });
-    showToast('Agent created!', 'success');
+    showToast('Agent created successfully!', 'success');
     document.getElementById('createAgentModal').classList.remove('show');
     loadAgents();
   } catch(err) { showToast(err.message || 'Failed to create agent.', 'error'); }
 }
 
 function openEditAgent(id) {
-  const a = _agents.find(x => x.id === id); if (!a) return;
-  document.getElementById('ea-id').value        = a.id;
-  document.getElementById('ea-name').value      = a.full_name || '';
-  document.getElementById('ea-phone').value     = a.phone || '';
-  document.getElementById('ea-moncash').value   = a.moncash_phone || '';
-  document.getElementById('ea-natcash').value   = a.natcash_phone || '';
-  document.getElementById('ea-password').value  = '';
-  document.getElementById('ea-suspended').value = a.is_suspended ? 'suspended' : 'active';
+  var a = _agents.find(function(x){ return x.id === id; });
+  if (!a) return;
+  document.getElementById('ea-id').value          = a.id;
+  document.getElementById('ea-name').value        = a.full_name || '';
+  document.getElementById('ea-phone').value       = a.phone || '';
+  document.getElementById('ea-moncash').value     = a.moncash_phone || '';
+  document.getElementById('ea-natcash').value     = a.natcash_phone || '';
+  document.getElementById('ea-password').value    = '';
+  document.getElementById('ea-suspended').value   = a.is_suspended ? 'suspended' : 'active';
   document.getElementById('editAgentModal').classList.add('show');
 }
 
 async function saveEditAgent() {
-  const id            = document.getElementById('ea-id').value;
-  const full_name     = document.getElementById('ea-name').value.trim();
-  const phone         = document.getElementById('ea-phone').value.trim();
-  const moncash_phone = document.getElementById('ea-moncash').value.trim();
-  const natcash_phone = document.getElementById('ea-natcash').value.trim();
-  const password      = document.getElementById('ea-password').value;
-  const status        = document.getElementById('ea-suspended').value;
-  const body = { full_name, phone, moncash_phone, natcash_phone, is_suspended: status === 'suspended' };
-  if (password) { if (password.length < 8) { showToast('Password min 8 chars.', 'warning'); return; } body.password = password; }
+  var id            = document.getElementById('ea-id').value;
+  var full_name     = document.getElementById('ea-name').value.trim();
+  var phone         = document.getElementById('ea-phone').value.trim();
+  var moncash_phone = document.getElementById('ea-moncash').value.trim();
+  var natcash_phone = document.getElementById('ea-natcash').value.trim();
+  var password      = document.getElementById('ea-password').value;
+  var status        = document.getElementById('ea-suspended').value;
+  var body = { full_name: full_name, phone: phone, moncash_phone: moncash_phone, natcash_phone: natcash_phone, is_suspended: status === 'suspended' };
+  if (password) {
+    if (password.length < 8) { showToast('Password must be at least 8 characters.', 'warning'); return; }
+    body.password = password;
+  }
   try {
     await adminFetch('agents/' + id, { method: 'PUT', body: JSON.stringify(body) });
     showToast('Agent updated.', 'success');
@@ -1481,7 +1484,7 @@ async function saveEditAgent() {
 
 async function toggleAgentSuspend(id, suspend) {
   try {
-    await adminFetch('agents/' + id, { method: 'PUT', body: JSON.stringify({ is_suspended: suspend }) });
+    await adminFetch('agents/' + id, { method: 'PUT', body: JSON.stringify({ is_suspended: suspend, suspension_reason: suspend ? 'Suspended by admin' : '' }) });
     showToast(suspend ? 'Agent suspended.' : 'Agent unsuspended.', 'success');
     loadAgents();
   } catch(err) { showToast(err.message, 'error'); }
@@ -1514,120 +1517,5 @@ async function changePassword() {
 
 
 
-// ── AGENTS ────────────────────────────────────────────────────
-let _agents = [];
-
-async function loadAgents() {
-  const tbody = document.getElementById('agentTbody');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading…</td></tr>';
-  try {
-    const data = await adminFetch('agents');
-    _agents = data.agents || [];
-    const badge = document.getElementById('sb-agents-count');
-    if (badge) badge.textContent = _agents.length;
-    renderAgents(_agents);
-  } catch(err) {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:2rem">Error: ' + (err.message||'failed') + '</td></tr>';
-    showToast(err.message || 'Failed to load agents', 'error');
-  }
-}
-
-function renderAgents(agents) {
-  const tbody = document.getElementById('agentTbody');
-  if (!tbody) return;
-  if (!agents.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">No agents yet. Click "+ Add Agent" to create one.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = agents.map(a => {
-    const online = !!a.is_online;
-    const sc = a.is_suspended ? 'fail' : (online ? 'done' : 'pend');
-    const sl = a.is_suspended ? 'Suspended' : (online ? 'Online' : 'Offline');
-    return '<tr>' +
-      '<td><div style="font-weight:600;color:var(--text)">' + (a.full_name||'—') + '</div>' +
-      '<div style="font-size:.74rem;color:var(--muted)">' + (a.email||'—') + '</div></td>' +
-      '<td style="color:var(--muted)">' + (a.phone||'—') + '</td>' +
-      '<td style="font-family:monospace;font-size:.78rem">' + (a.moncash_phone||'—') + '</td>' +
-      '<td style="font-family:monospace;font-size:.78rem">' + (a.natcash_phone||'—') + '</td>' +
-      '<td style="color:var(--teal);font-weight:600">' + (a.transfers_mc_to_nc||0) + '</td>' +
-      '<td style="color:var(--teal);font-weight:600">' + (a.transfers_nc_to_mc||0) + '</td>' +
-      '<td><span class="status-dot ' + sc + '">' + sl + '</span></td>' +
-      '<td><span class="status-dot ' + (a.is_suspended?'fail':'done') + '">' + (a.is_suspended?'Suspended':'Active') + '</span></td>' +
-      '<td style="display:flex;gap:.4rem">' +
-        '<button class="btn btn-ghost btn-sm" onclick="openEditAgent('' + a.id + '')">Edit</button>' +
-        (a.is_suspended
-          ? '<button class="btn btn-outline btn-sm" onclick="toggleAgentSuspend('' + a.id + '',false)">Unsuspend</button>'
-          : '<button class="btn btn-danger btn-sm" onclick="toggleAgentSuspend('' + a.id + '',true)">Suspend</button>') +
-      '</td>' +
-    '</tr>';
-  }).join('');
-}
-
-function openCreateAgent() {
-  ['ca-name','ca-email','ca-phone','ca-password','ca-moncash','ca-natcash'].forEach(function(id){
-    var el = document.getElementById(id); if(el) el.value='';
-  });
-  document.getElementById('createAgentModal').classList.add('show');
-}
-
-async function createAgent() {
-  var full_name     = document.getElementById('ca-name').value.trim();
-  var email         = document.getElementById('ca-email').value.trim();
-  var phone         = document.getElementById('ca-phone').value.trim();
-  var password      = document.getElementById('ca-password').value;
-  var moncash_phone = document.getElementById('ca-moncash').value.trim();
-  var natcash_phone = document.getElementById('ca-natcash').value.trim();
-  if (!full_name || !email || !password) { showToast('Name, email and password are required.','warning'); return; }
-  if (password.length < 8) { showToast('Password must be at least 8 characters.','warning'); return; }
-  try {
-    await adminFetch('agents', { method:'POST', body: JSON.stringify({full_name,email,phone,password,moncash_phone,natcash_phone}) });
-    showToast('Agent created!','success');
-    document.getElementById('createAgentModal').classList.remove('show');
-    loadAgents();
-  } catch(err) { showToast(err.message||'Failed to create agent.','error'); }
-}
-
-function openEditAgent(id) {
-  var a = _agents.find(function(x){ return x.id===id; });
-  if (!a) return;
-  document.getElementById('ea-id').value        = a.id;
-  document.getElementById('ea-name').value      = a.full_name||'';
-  document.getElementById('ea-phone').value     = a.phone||'';
-  document.getElementById('ea-moncash').value   = a.moncash_phone||'';
-  document.getElementById('ea-natcash').value   = a.natcash_phone||'';
-  document.getElementById('ea-password').value  = '';
-  document.getElementById('ea-suspended').value = a.is_suspended ? 'suspended' : 'active';
-  document.getElementById('editAgentModal').classList.add('show');
-}
-
-async function saveEditAgent() {
-  var id            = document.getElementById('ea-id').value;
-  var full_name     = document.getElementById('ea-name').value.trim();
-  var phone         = document.getElementById('ea-phone').value.trim();
-  var moncash_phone = document.getElementById('ea-moncash').value.trim();
-  var natcash_phone = document.getElementById('ea-natcash').value.trim();
-  var password      = document.getElementById('ea-password').value;
-  var status        = document.getElementById('ea-suspended').value;
-  var body = { full_name:full_name, phone:phone, moncash_phone:moncash_phone, natcash_phone:natcash_phone, is_suspended: status==='suspended' };
-  if (password) {
-    if (password.length < 8) { showToast('Password must be at least 8 characters.','warning'); return; }
-    body.password = password;
-  }
-  try {
-    await adminFetch('agents/' + id, { method:'PUT', body: JSON.stringify(body) });
-    showToast('Agent updated.','success');
-    document.getElementById('editAgentModal').classList.remove('show');
-    loadAgents();
-  } catch(err) { showToast(err.message||'Failed to update agent.','error'); }
-}
-
-async function toggleAgentSuspend(id, suspend) {
-  try {
-    await adminFetch('agents/' + id, { method:'PUT', body: JSON.stringify({ is_suspended: suspend, suspension_reason: suspend ? 'Suspended by admin' : '' }) });
-    showToast(suspend ? 'Agent suspended.' : 'Agent unsuspended.','success');
-    loadAgents();
-  } catch(err) { showToast(err.message,'error'); }
-}
 
 </script>
