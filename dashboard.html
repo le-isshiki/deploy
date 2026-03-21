@@ -229,6 +229,7 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
         <div class="tabs">
           <button class="tab on" id="t1" onclick="switchTab(1)">MonCash &rarr; NatCash</button>
           <button class="tab" id="t2" onclick="switchTab(2)">NatCash &rarr; MonCash</button>
+          <button class="tab" id="t3" onclick="switchTab(3)" style="background:rgba(34,197,94,.08);color:var(--ok)">+ Deposit</button>
         </div>
         <div class="pane on" id="p1">
           <div class="frow"><div class="fg"><label>Amount (HTG)</label><input class="fi" type="number" id="a1" placeholder="Max 50,000" min="1" max="50000" oninput="calc(1)"/></div><div class="fg"><label>Recipient Phone</label><input class="fi" type="tel" id="ph1" placeholder="+509 XX XX XXXX"/></div></div>
@@ -239,6 +240,42 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
           <div class="frow"><div class="fg"><label>Amount (HTG)</label><input class="fi" type="number" id="a2" placeholder="Max 75,000" min="1" max="75000" oninput="calc(2)"/></div><div class="fg"><label>Recipient Phone</label><input class="fi" type="tel" id="ph2" placeholder="+509 XX XX XXXX"/></div></div>
           <div class="fee-box"><div class="fee-row"><span class="fl">Amount</span><span class="fv" id="d2a">0.00 HTG</span></div><div class="fee-row"><span class="fl">Fee (5%)</span><span class="fv" style="color:var(--teal)" id="d2f">0.00 HTG</span></div><div class="fee-row total"><span class="fl">Total deducted</span><span class="fv" id="d2t">0.00 HTG</span></div></div>
           <button class="btn-send" id="s2" onclick="send(2)"><div class="spin" id="sp2"></div><span class="slbl" style="display:flex;align-items:center;gap:.45rem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send Transfer</span></button>
+        </div>
+        <div class="pane" id="p3">
+          <div class="fg" style="margin-bottom:.75rem">
+            <label>Wallet Type</label>
+            <select class="fi" id="dep-wallet">
+              <option value="moncash">MonCash</option>
+              <option value="natcash">NatCash</option>
+            </select>
+          </div>
+          <div class="fg" style="margin-bottom:.75rem">
+            <label>Amount (HTG)</label>
+            <input class="fi" type="number" id="dep-amount" placeholder="e.g. 5000" min="100"/>
+          </div>
+          <div class="fg" style="margin-bottom:.75rem">
+            <label>Transfer Reference (optional)</label>
+            <input class="fi" type="text" id="dep-ref" placeholder="Transaction ID from your wallet app"/>
+          </div>
+          <div class="fg" style="margin-bottom:.75rem">
+            <label>Receipt Photo</label>
+            <div id="dep-drop" onclick="document.getElementById('dep-file').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:18px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.02)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" style="margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <div style="font-size:.82rem;color:var(--muted)">Click to upload receipt screenshot</div>
+              <img id="dep-preview" style="display:none;max-width:100%;max-height:160px;margin-top:10px;border-radius:var(--r);object-fit:contain"/>
+            </div>
+            <input type="file" id="dep-file" accept="image/*" style="display:none" onchange="depFileSelect(this)"/>
+          </div>
+          <div id="dep-note" style="font-size:.78rem;color:var(--muted);padding:.75rem;background:rgba(0,201,177,.05);border:1px solid var(--border);border-radius:var(--r);margin-bottom:.75rem;line-height:1.6">
+            Send money to our <strong style="color:var(--text)">MonCash</strong> or <strong style="color:var(--text)">NatCash</strong> number, then upload the receipt here. An admin will credit your wallet within 15 minutes.
+          </div>
+          <button class="btn-send" id="s3" onclick="submitDeposit()">
+            <div class="spin" id="sp3"></div>
+            <span class="slbl" style="display:flex;align-items:center;gap:.45rem">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Submit Deposit Request
+            </span>
+          </button>
         </div>
       </div>
       <div class="fee-panel">
@@ -493,7 +530,7 @@ function calc(t) {
   document.getElementById('d'+t+'f').textContent=SC.fmt(fee);
   document.getElementById('d'+t+'t').textContent=SC.fmt(a+fee);
 }
-function switchTab(t) { [1,2].forEach(i=>{document.getElementById('t'+i).classList.toggle('on',i===t);document.getElementById('p'+i).classList.toggle('on',i===t);}); }
+function switchTab(t) { [1,2,3].forEach(i=>{document.getElementById('t'+i).classList.toggle('on',i===t);document.getElementById('p'+i).classList.toggle('on',i===t);}); }
 
 async function send(t) {
   const amt=parseFloat(document.getElementById('a'+t).value)||0, phone=document.getElementById('ph'+t).value.trim(), max=t===1?50000:75000;
@@ -682,6 +719,70 @@ async function saveProfile() {
 }
 
 loadDashboard();
+
+// ── DEPOSIT ───────────────────────────────────────────────────
+let depFileBlob = null;
+
+function depFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  depFileBlob = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('dep-preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.getElementById('dep-drop').style.borderColor = 'var(--teal)';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitDeposit() {
+  const wallet = document.getElementById('dep-wallet').value;
+  const amount = parseFloat(document.getElementById('dep-amount').value);
+  const ref    = document.getElementById('dep-ref').value.trim();
+
+  if (!amount || amount < 100) { toast('Minimum deposit is 100 HTG.', 'error'); return; }
+  if (!depFileBlob)            { toast('Please upload a receipt photo.', 'error'); return; }
+
+  const btn = document.getElementById('s3');
+  btn.classList.add('ld');
+
+  try {
+    // Convert image to base64
+    const base64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload  = () => res(r.result.split(',')[1]);
+      r.onerror = rej;
+      r.readAsDataURL(depFileBlob);
+    });
+
+    await SC.fetch('/transfers/deposit-receipt', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_base64: base64,
+        image_name:   depFileBlob.name,
+        image_type:   depFileBlob.type,
+        wallet_type:  wallet,
+        amount,
+        reference:    ref || null,
+      })
+    });
+
+    toast('Deposit request submitted! Your wallet will be credited within 15 minutes.', 'success');
+    // Reset form
+    document.getElementById('dep-amount').value = '';
+    document.getElementById('dep-ref').value    = '';
+    document.getElementById('dep-file').value   = '';
+    document.getElementById('dep-preview').style.display = 'none';
+    document.getElementById('dep-drop').style.borderColor = '';
+    depFileBlob = null;
+    switchTab(1);
+  } catch(err) {
+    toast(err.message || 'Deposit submission failed. Please try again.', 'error');
+  }
+  btn.classList.remove('ld');
+}
 </script>
 </body>
 </html>
