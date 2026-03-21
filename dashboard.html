@@ -748,28 +748,27 @@ async function submitDeposit() {
   btn.classList.add('ld');
 
   try {
-    // Convert image to base64
-    const base64 = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload  = () => res(r.result.split(',')[1]);
-      r.onerror = rej;
-      r.readAsDataURL(depFileBlob);
-    });
+    const body = { wallet_type: wallet, amount, reference: ref || null };
 
-    await SC.fetch('/transfers/deposit-receipt', {
+    // Attach image if selected (optional)
+    if (depFileBlob) {
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload  = () => res(r.result.split(',')[1]);
+        r.onerror = rej;
+        r.readAsDataURL(depFileBlob);
+      });
+      body.image_base64 = base64;
+      body.image_type   = depFileBlob.type;
+      body.image_name   = depFileBlob.name;
+    }
+
+    const data = await SC.fetch('/transfers/deposit-receipt', {
       method: 'POST',
-      body: JSON.stringify({
-        image_base64: base64,
-        image_name:   depFileBlob.name,
-        image_type:   depFileBlob.type,
-        wallet_type:  wallet,
-        amount,
-        reference:    ref || null,
-      })
+      body: JSON.stringify(body)
     });
 
-    toast('Deposit request submitted! Your wallet will be credited within 15 minutes.', 'success');
-    // Reset form
+    toast(data.message || 'Deposit request submitted!', 'success');
     document.getElementById('dep-amount').value = '';
     document.getElementById('dep-ref').value    = '';
     document.getElementById('dep-file').value   = '';
@@ -778,7 +777,7 @@ async function submitDeposit() {
     depFileBlob = null;
     switchTab(1);
   } catch(err) {
-    toast(err.message || 'Deposit submission failed. Please try again.', 'error');
+    toast(err.message || 'Deposit failed. Please try again.', 'error');
   }
   btn.classList.remove('ld');
 }
