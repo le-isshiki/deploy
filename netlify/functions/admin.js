@@ -88,7 +88,7 @@ export default async (req) => {
     const [newUsers]    = await sql`SELECT COUNT(*) AS count FROM profiles WHERE created_at >= NOW() - INTERVAL '7 days'`;
     const [newTxns]     = await sql`SELECT COUNT(*) AS count FROM transactions WHERE created_at >= NOW() - INTERVAL '7 days' AND status='completed'`;
     const [volWeek]     = await sql`SELECT COALESCE(SUM(amount),0) AS total FROM transactions WHERE created_at >= NOW() - INTERVAL '7 days' AND status='completed' AND type='send'`;
-    const [deposits]    = await sql`SELECT COUNT(*) AS count FROM deposit_requests WHERE status='pending'`;
+    const [deposits]    = await sql`SELECT COUNT(*) AS count FROM deposit_receipts WHERE status='pending'`;
     const [withdrawals] = await sql`SELECT COUNT(*) AS count FROM withdrawal_requests WHERE status='pending'`;
     // Recent activity for overview feed
     const signups   = await sql`SELECT 'New signup: ' || COALESCE(full_name, email) AS event, created_at FROM profiles ORDER BY created_at DESC LIMIT 5`;
@@ -278,8 +278,8 @@ export default async (req) => {
   if (req.method === 'GET' && resource === 'deposits') {
     const status = url.searchParams.get('status') ?? 'pending';
     const deposits = status !== 'all'
-      ? await sql`SELECT d.*, p.email, p.full_name, p.phone FROM deposit_requests d JOIN profiles p ON p.id = d.user_id WHERE d.status = ${status} ORDER BY d.created_at DESC LIMIT 100`
-      : await sql`SELECT d.*, p.email, p.full_name, p.phone FROM deposit_requests d JOIN profiles p ON p.id = d.user_id ORDER BY d.created_at DESC LIMIT 100`;
+      ? await sql`SELECT dr.*, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id WHERE dr.status = ${status} ORDER BY dr.created_at DESC LIMIT 100`
+      : await sql`SELECT dr.*, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id ORDER BY dr.created_at DESC LIMIT 100`;
     return response(200, { deposits });
   }
 
@@ -289,23 +289,23 @@ export default async (req) => {
     const notes  = sanitize(body?.notes ?? '');
     if (!['confirmed','rejected'].includes(status)) return errorResponse(400, 'Status must be confirmed or rejected');
     const [deposit] = await sql`
-      UPDATE deposit_requests SET status=${status}, notes=${notes}, confirmed_by=${adminUser}, confirmed_at=NOW()
+      UPDATE deposit_receipts SET status=${status}, upload_method=${notes || adminUser}
       WHERE id=${subId} AND status='pending' RETURNING *
     `;
     if (!deposit) return errorResponse(404, 'Not found or already processed');
     if (status === 'confirmed') {
-      await sql`UPDATE wallets SET balance=balance+${deposit.amount} WHERE user_id=${deposit.user_id} AND currency=${deposit.currency}`;
+      await sql`UPDATE wallets SET balance=balance+${deposit.amount} WHERE user_id=${deposit.user_id} AND currency='HTG'`;
       await sql`
         INSERT INTO transactions (receiver_id, wallet_id, type, amount, currency, status, description, completed_at)
-        SELECT ${deposit.user_id}, w.id, 'deposit', ${deposit.amount}, ${deposit.currency}, 'completed',
+        SELECT ${deposit.user_id}, w.id, 'deposit', ${deposit.amount}, 'HTG', 'completed',
                ${'Deposit confirmed — ref: '+(deposit.reference||'N/A')}, NOW()
-        FROM wallets w WHERE w.user_id=${deposit.user_id} AND w.currency=${deposit.currency}
+        FROM wallets w WHERE w.user_id=${deposit.user_id} AND w.currency='HTG'
       `;
       sql`SELECT email, full_name FROM profiles WHERE id=${deposit.user_id}`.then(([p]) => {
         if (p) sendDepositConfirmedEmail(p.email, p.full_name, deposit.amount).catch(() => {});
       }).catch(() => {});
     }
-    await auditLog(sql, adminUser, `deposit_${status}`, 'deposit', subId, { amount: deposit.amount, notes }, ip);
+    await auditLog(sql, adminUser, 'deposit_'+status, 'deposit_receipt', subId, { amount: deposit.amount, notes }, ip);
     return response(200, { deposit });
   }
 
@@ -358,27 +358,44 @@ export default async (req) => {
 
   // ── AGENTS LIST ────────────────────────────────────────────
   if (req.method === 'GET' && resource === 'agents' && !subId) {
-    await sql`SELECT expire_stale_claims()`;
+    // Expire stale claims safely (don't crash if table empty)
+    try { await sql`SELECT expire_stale_claims()`; } catch {}
+
+    // Fetch agents without correlated subqueries for compatibility
     const agents = await sql`
-      SELECT a.id, a.email, a.full_name, a.phone,
-             a.moncash_phone, a.natcash_phone,
-             a.is_active, a.is_suspended, a.suspension_reason,
-             a.transfers_mc_to_nc, a.transfers_nc_to_mc,
-             a.total_amount_processed, a.last_seen_at, a.created_at,
-             (SELECT last_ping_at FROM agent_sessions s
-              WHERE s.agent_id = a.id AND s.expires_at > NOW()
-              ORDER BY last_ping_at DESC LIMIT 1) AS last_ping,
-             (SELECT online_since FROM agent_sessions s
-              WHERE s.agent_id = a.id AND s.expires_at > NOW()
-              ORDER BY last_ping_at DESC LIMIT 1) AS online_since
-      FROM agents a
-      ORDER BY a.created_at DESC
+      SELECT id, email, full_name, phone,
+             moncash_phone, natcash_phone,
+             is_active, is_suspended, suspension_reason,
+             transfers_mc_to_nc, transfers_nc_to_mc,
+             total_amount_processed, last_seen_at, created_at
+      FROM agents
+      ORDER BY created_at DESC
     `;
+
+    // Fetch active sessions separately
+    const sessions = await sql`
+      SELECT DISTINCT ON (agent_id)
+             agent_id, last_ping_at, online_since
+      FROM agent_sessions
+      WHERE expires_at > NOW()
+      ORDER BY agent_id, last_ping_at DESC
+    `;
+
+    const sessionMap = {};
+    for (const s of sessions) sessionMap[s.agent_id] = s;
+
     const now = Date.now();
-    const result = agents.map(a => ({
-      ...a,
-      is_online: a.last_ping ? (now - new Date(a.last_ping).getTime()) < 90000 : false,
-    }));
+    const result = agents.map(a => {
+      const sess = sessionMap[a.id];
+      const isOnline = sess ? (now - new Date(sess.last_ping_at).getTime()) < 90000 : false;
+      return {
+        ...a,
+        last_ping:  sess?.last_ping_at  ?? null,
+        online_since: sess?.online_since ?? null,
+        is_online: isOnline,
+      };
+    });
+
     return response(200, { agents: result });
   }
 
