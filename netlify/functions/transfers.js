@@ -37,6 +37,7 @@ export default async (req) => {
         SELECT full_name, phone, email FROM profiles WHERE id = ${session.user_id}
       `;
 
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS reference TEXT`;
       const [receipt] = await sql`
         INSERT INTO deposit_receipts (user_id, image_url, wallet_type, amount, reference, upload_method)
         VALUES (
