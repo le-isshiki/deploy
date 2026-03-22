@@ -1,53 +1,21 @@
 // TEMPORARY debug endpoint — DELETE after fixing
-import { getDb, getDbDirect, getSession } from './_utils/db.js';
+import { getDb, getDbDirect } from './_utils/db.js';
 
 const IS_SANDBOX    = process.env.MONCASH_MODE !== 'live';
 const API_HOST      = IS_SANDBOX
   ? 'https://sandbox.moncashbutton.digicelgroup.com/Api'
   : 'https://moncashbutton.digicelgroup.com/Api';
+const GW_BASE       = IS_SANDBOX
+  ? 'https://sandbox.moncashbutton.digicelgroup.com/Moncash-middleware'
+  : 'https://moncashbutton.digicelgroup.com/Moncash-middleware';
 const CLIENT_ID     = process.env.MONCASH_CLIENT_ID;
 const CLIENT_SECRET = process.env.MONCASH_CLIENT_SECRET;
 
 export default async (req) => {
   const results = {};
 
-  // Step 1: env vars present?
-  results.env = {
-    has_client_id:     !!CLIENT_ID,
-    has_client_secret: !!CLIENT_SECRET,
-    client_id_preview: CLIENT_ID ? CLIENT_ID.slice(0,8)+'...' : 'MISSING',
-    mode:              IS_SANDBOX ? 'sandbox' : 'live',
-    api_host:          API_HOST,
-  };
-
-  // Step 2: DB connection
-  try {
-    const sql = getDb();
-    await sql`SELECT 1`;
-    results.db_pooled = 'OK';
-  } catch(e) {
-    results.db_pooled = 'FAILED: ' + e.message;
-  }
-
-  // Step 3: DB unpooled
-  try {
-    const sqlD = getDbDirect();
-    await sqlD`SELECT 1`;
-    results.db_unpooled = 'OK';
-  } catch(e) {
-    results.db_unpooled = 'FAILED: ' + e.message;
-  }
-
-  // Step 4: Session check
-  try {
-    const sql = getDb();
-    const session = await getSession(req, sql);
-    results.session = session ? 'OK — user_id: ' + session.user_id : 'No session (not logged in)';
-  } catch(e) {
-    results.session = 'FAILED: ' + e.message;
-  }
-
-  // Step 5: MonCash token
+  // Step 1: Get MonCash token
+  let mcToken;
   try {
     const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
     const res = await fetch(`${API_HOST}/oauth/token`, {
@@ -60,12 +28,58 @@ export default async (req) => {
       body: 'scope=read,write&grant_type=client_credentials',
     });
     const body = await res.text();
-    results.moncash_token = {
-      status: res.status,
-      body:   body.slice(0, 500),
-    };
+    const data = JSON.parse(body);
+    mcToken = data.access_token;
+    results.step1_token = mcToken ? 'OK — got token' : 'NO TOKEN: ' + body;
   } catch(e) {
-    results.moncash_token = 'FETCH FAILED: ' + e.message;
+    results.step1_token = 'FAILED: ' + e.message;
+    return new Response(JSON.stringify(results, null, 2), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  // Step 2: CreatePayment with test amount
+  try {
+    const testOrderId = 'SC-DEBUG-' + Date.now();
+    const payload = { amount: 100, orderId: testOrderId };
+    const res = await fetch(`${API_HOST}/v1/CreatePayment`, {
+      method: 'POST',
+      headers: {
+        'Accept':        'application/json',
+        'Authorization': `Bearer ${mcToken}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.text();
+    results.step2_create_payment = {
+      status: res.status,
+      body:   body.slice(0, 800),
+      payload_sent: payload,
+    };
+
+    if (res.ok) {
+      const data = JSON.parse(body);
+      const token = data?.payment_token?.token;
+      if (token) {
+        results.step3_redirect_url = `${GW_BASE}/Payment/Redirect?token=${token}`;
+      }
+    }
+  } catch(e) {
+    results.step2_create_payment = 'FAILED: ' + e.message;
+  }
+
+  // Step 3: Test DB insert with fake UUID
+  try {
+    const sqlDirect = getDbDirect();
+    const fakeUserId = '00000000-0000-0000-0000-000000000000';
+    const testOrder  = 'SC-DBTEST-' + Date.now();
+    // Try insert — will fail on FK but shows if schema is the issue
+    await sqlDirect`
+      INSERT INTO deposit_receipts (user_id, image_url, wallet_type, amount, reference, moncash_order_id, status, upload_method)
+      VALUES (${fakeUserId}, 'moncash-auto', 'moncash', 100, ${testOrder}, ${testOrder}, 'initiated', 'moncash_api')
+    `;
+    results.step4_db_insert = 'OK';
+  } catch(e) {
+    results.step4_db_insert = 'FAILED (expected if FK error): ' + e.message;
   }
 
   return new Response(JSON.stringify(results, null, 2), {
