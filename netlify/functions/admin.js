@@ -88,7 +88,7 @@ export default async (req) => {
     const [newUsers]    = await sql`SELECT COUNT(*) AS count FROM profiles WHERE created_at >= NOW() - INTERVAL '7 days'`;
     const [newTxns]     = await sql`SELECT COUNT(*) AS count FROM transactions WHERE created_at >= NOW() - INTERVAL '7 days' AND status='completed'`;
     const [volWeek]     = await sql`SELECT COALESCE(SUM(amount),0) AS total FROM transactions WHERE created_at >= NOW() - INTERVAL '7 days' AND status='completed' AND type='send'`;
-    const [deposits]    = await sql`SELECT COUNT(*) AS count FROM deposit_receipts WHERE status='pending'`;
+    const [deposits]    = await sql`SELECT COUNT(*) AS count FROM deposit_receipts`.catch(() => ([{count:0}]));
     const [withdrawals] = await sql`SELECT COUNT(*) AS count FROM withdrawal_requests WHERE status='pending'`;
     // Recent activity for overview feed
     const signups   = await sql`SELECT 'New signup: ' || COALESCE(full_name, email) AS event, created_at FROM profiles ORDER BY created_at DESC LIMIT 5`;
@@ -277,11 +277,18 @@ export default async (req) => {
   // ── DEPOSITS ───────────────────────────────────────────────
   if (req.method === 'GET' && resource === 'deposits') {
     try {
-      const status = url.searchParams.get('status') ?? 'pending';
-      // Ensure reference column exists
+      // Auto-migrate deposit_receipts table — safe to run every time
       await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS reference TEXT`;
-      const deposits = status !== 'all'
-        ? await sql`SELECT dr.id, dr.user_id, dr.wallet_type, dr.amount, dr.reference, dr.status, dr.image_url, dr.created_at, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id WHERE dr.status = ${status} ORDER BY dr.created_at DESC LIMIT 100`
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS wallet_type TEXT`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS amount NUMERIC(18,2)`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS image_url TEXT`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS upload_method TEXT DEFAULT 'dashboard'`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS notified_admin_at TIMESTAMPTZ`;
+
+      const filter = url.searchParams.get('status') ?? 'pending';
+      const deposits = filter !== 'all'
+        ? await sql`SELECT dr.id, dr.user_id, dr.wallet_type, dr.amount, dr.reference, dr.status, dr.image_url, dr.created_at, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id WHERE dr.status = ${filter} ORDER BY dr.created_at DESC LIMIT 100`
         : await sql`SELECT dr.id, dr.user_id, dr.wallet_type, dr.amount, dr.reference, dr.status, dr.image_url, dr.created_at, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id ORDER BY dr.created_at DESC LIMIT 100`;
       return response(200, { deposits });
     } catch(err) {
@@ -295,6 +302,7 @@ export default async (req) => {
       const status = body?.status;
       const notes  = sanitize(body?.notes ?? '');
       if (!['confirmed','rejected'].includes(status)) return errorResponse(400, 'Status must be confirmed or rejected');
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`;
       const [deposit] = await sql`
         UPDATE deposit_receipts SET status=${status}
         WHERE id=${subId} AND status='pending' RETURNING *
