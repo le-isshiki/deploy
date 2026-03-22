@@ -135,8 +135,8 @@ export default async (req) => {
         amount,
       });
     } catch (err) {
-      console.error('MonCash initiate error:', err.message);
-      return errorResponse(500, 'Could not initiate MonCash payment: ' + err.message);
+      console.error('MonCash initiate error:', err.message, err.stack);
+      return errorResponse(500, 'Could not initiate MonCash payment: ' + err.message + (err.cause ? ' | cause: ' + err.cause : ''));
     }
   }
 
