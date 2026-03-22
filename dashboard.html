@@ -245,21 +245,48 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
         <div class="box-title">Transfer Money</div>
         <div class="box-sub">Enter amount and recipient phone number.</div>
         <div class="tabs">
-          <button class="tab on" id="t1" onclick="switchTab(1)">MonCash &rarr; NatCash</button>
-          <button class="tab" id="t2" onclick="switchTab(2)">NatCash &rarr; MonCash</button>
-          <button class="tab" id="t3" onclick="switchTab(3)" style="background:rgba(34,197,94,.08);color:var(--ok)">+ Deposit</button>
+          <button class="tab on" id="t1" onclick="switchTab(1)">Wallet → MonCash</button>
+          <button class="tab" id="t2" onclick="switchTab(2)">Wallet → NatCash</button>
+          <button class="tab" id="t3" onclick="switchTab(3)">Send to User</button>
+          <button class="tab" id="t4" onclick="switchTab(4)" style="background:rgba(34,197,94,.08);color:var(--ok)">+ Deposit</button>
         </div>
         <div class="pane on" id="p1">
-          <div class="frow"><div class="fg"><label>Amount (HTG)</label><input class="fi" type="number" id="a1" placeholder="Max 50,000" min="1" max="50000" oninput="calc(1)"/></div><div class="fg"><label>Recipient Phone</label><input class="fi" type="tel" id="ph1" placeholder="+509 XX XX XXXX"/></div></div>
+          <div class="frow"><div class="fg"><label>Amount (HTG)</label><input class="fi" type="number" id="a1" placeholder="Amount (HTG)" min="1" max="50000" oninput="calc(1)"/></div><div class="fg"><label>Recipient Phone</label><input class="fi" type="tel" id="ph1" placeholder="+509 XX XX XXXX"/></div></div>
           <div class="fee-box"><div class="fee-row"><span class="fl">Amount</span><span class="fv" id="d1a">0.00 HTG</span></div><div class="fee-row"><span class="fl">Fee (5%)</span><span class="fv" style="color:var(--teal)" id="d1f">0.00 HTG</span></div><div class="fee-row total"><span class="fl">Total deducted</span><span class="fv" id="d1t">0.00 HTG</span></div></div>
           <button class="btn-send" id="s1" onclick="send(1)"><div class="spin" id="sp1"></div><span class="slbl" style="display:flex;align-items:center;gap:.45rem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send Transfer</span></button>
         </div>
         <div class="pane" id="p2">
-          <div class="frow"><div class="fg"><label>Amount (HTG)</label><input class="fi" type="number" id="a2" placeholder="Max 75,000" min="1" max="75000" oninput="calc(2)"/></div><div class="fg"><label>Recipient Phone</label><input class="fi" type="tel" id="ph2" placeholder="+509 XX XX XXXX"/></div></div>
+          <div class="frow"><div class="fg"><label>Amount (HTG)</label><input class="fi" type="number" id="a2" placeholder="Amount (HTG)" min="1" max="75000" oninput="calc(2)"/></div><div class="fg"><label>Recipient Phone</label><input class="fi" type="tel" id="ph2" placeholder="+509 XX XX XXXX"/></div></div>
           <div class="fee-box"><div class="fee-row"><span class="fl">Amount</span><span class="fv" id="d2a">0.00 HTG</span></div><div class="fee-row"><span class="fl">Fee (5%)</span><span class="fv" style="color:var(--teal)" id="d2f">0.00 HTG</span></div><div class="fee-row total"><span class="fl">Total deducted</span><span class="fv" id="d2t">0.00 HTG</span></div></div>
           <button class="btn-send" id="s2" onclick="send(2)"><div class="spin" id="sp2"></div><span class="slbl" style="display:flex;align-items:center;gap:.45rem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send Transfer</span></button>
         </div>
         <div class="pane" id="p3">
+          <div style="display:flex;flex-direction:column;gap:.75rem">
+            <div class="fg">
+              <label>Recipient Username or Phone</label>
+              <input class="fi" type="text" id="p2p-recipient" placeholder="@username or +509 XXXX XXXX" oninput="lookupP2PUser()"/>
+              <div id="p2p-found" style="display:none;margin-top:.4rem;padding:.5rem .75rem;background:rgba(0,201,177,.07);border:1px solid rgba(0,201,177,.2);border-radius:8px;font-size:.8rem;color:var(--teal)"></div>
+              <div id="p2p-notfound" style="display:none;margin-top:.4rem;font-size:.8rem;color:#f87171">No SwitchCash account found.</div>
+            </div>
+            <div class="fg">
+              <label>Amount (HTG)</label>
+              <input class="fi" type="number" id="p2p-amount" placeholder="Any amount" min="1" oninput="calcP2P()"/>
+            </div>
+            <div id="p2p-fee-box" style="display:none;background:rgba(255,255,255,.03);border:1px solid var(--border2);border-radius:var(--r);padding:.75rem 1rem;font-size:.83rem">
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Amount sent</span><span id="p2p-amt-display" style="font-weight:700;color:var(--white)">—</span></div>
+              <div style="display:flex;justify-content:space-between;margin-top:.3rem"><span style="color:var(--muted)">Fee</span><span style="color:#4ade80;font-weight:600">Free &#127881;</span></div>
+              <div style="display:flex;justify-content:space-between;margin-top:.3rem"><span style="color:var(--muted)">Recipient gets</span><span id="p2p-recv-display" style="color:var(--teal);font-weight:700">—</span></div>
+            </div>
+            <div style="background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.18);border-radius:var(--r);padding:.75rem 1rem;font-size:.8rem;color:var(--muted)">
+              &#127881; <strong style="color:#4ade80">Zero fee</strong> for transfers between SwitchCash users. Instant, no agents needed.
+            </div>
+            <button class="btn-send" id="sp2p-btn" onclick="sendP2P()">
+              <div class="spin" id="sp-p2p"></div>
+              <span class="slbl">Send Instantly — Free</span>
+            </button>
+          </div>
+        </div>
+        <div class="pane" id="p4">
           <div style="display:flex;flex-direction:column;gap:.75rem">
             <div class="fg">
               <label>Amount to deposit (HTG)</label>
@@ -281,8 +308,9 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
       </div>
       <div class="fee-panel">
         <div class="box-title" style="margin-bottom:1.25rem">Fee Structure</div>
-        <div class="fi-card"><div class="fi-top"><div class="fi-badge mc">MC</div><div><div class="fi-name">MonCash &rarr; NatCash</div><div class="fi-pct">5% flat</div></div></div><div class="fi-note">Max per transaction: 50,000 HTG</div></div>
-        <div class="fi-card"><div class="fi-top"><div class="fi-badge nc">NC</div><div><div class="fi-name">NatCash &rarr; MonCash</div><div class="fi-pct">5% flat</div></div></div><div class="fi-note">Max per transaction: 75,000 HTG</div></div>
+        <div class="fi-card"><div class="fi-top"><div class="fi-badge mc">MC</div><div><div class="fi-name">Wallet → MonCash</div><div class="fi-pct">5% flat</div></div></div><div class="fi-note">Max per transaction: 50,000 HTG</div></div>
+        <div class="fi-card"><div class="fi-top"><div class="fi-badge nc">NC</div><div><div class="fi-name">Wallet → NatCash</div><div class="fi-pct">5% flat</div></div></div><div class="fi-note">Max per transaction: 75,000 HTG</div></div>
+        <div class="fi-card"><div class="fi-top"><div class="fi-badge" style="background:rgba(74,222,128,.15);color:#4ade80">P2P</div><div><div class="fi-name">User to User</div><div class="fi-pct" style="color:#4ade80">FREE</div></div></div><div class="fi-note">Instant between SwitchCash accounts</div></div>
         <p style="font-size:.77rem;color:var(--muted);margin-top:1.1rem;line-height:1.6">No hidden fees. Fee is shown before you confirm every transfer.</p>
       </div>
     </div>
@@ -532,7 +560,7 @@ function calc(t) {
   document.getElementById('d'+t+'f').textContent=SC.fmt(fee);
   document.getElementById('d'+t+'t').textContent=SC.fmt(a+fee);
 }
-function switchTab(t) { [1,2,3].forEach(i=>{document.getElementById('t'+i).classList.toggle('on',i===t);document.getElementById('p'+i).classList.toggle('on',i===t);}); }
+function switchTab(t) { [1,2,3,4].forEach(i=>{document.getElementById('t'+i)?.classList.toggle('on',i===t);document.getElementById('p'+i)?.classList.toggle('on',i===t);}); }
 
 // Cancel countdown state
 let _pendingTx = null;
@@ -569,7 +597,7 @@ function showCancelModal(tx) {
   const deadline = new Date(tx.cancel_deadline);
   document.getElementById('cancel-amount').textContent = SC.fmt(tx.amount);
   document.getElementById('cancel-phone').textContent  = tx.recipient_phone;
-  document.getElementById('cancel-dir').textContent    = tx.direction==='mc_to_nc' ? 'MonCash → NatCash' : 'NatCash → MonCash';
+  document.getElementById('cancel-dir').textContent    = tx.direction==='mc_to_nc' ? 'Wallet → MonCash' : 'Wallet → NatCash';
   overlay.classList.add('open');
   clearInterval(_cancelTimer);
   _cancelTimer = setInterval(() => {
@@ -780,6 +808,73 @@ async function saveProfile() {
 }
 
 loadDashboard();
+
+// ── P2P TRANSFER (free, user-to-user) ────────────────────────
+let _p2pUser = null;
+let _lookupTimer = null;
+
+function calcP2P() {
+  const amount = parseFloat(document.getElementById('p2p-amount').value) || 0;
+  const box = document.getElementById('p2p-fee-box');
+  if (amount > 0) {
+    box.style.display = 'block';
+    document.getElementById('p2p-amt-display').textContent  = SC.fmt(amount);
+    document.getElementById('p2p-recv-display').textContent = SC.fmt(amount);
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function lookupP2PUser() {
+  clearTimeout(_lookupTimer);
+  const val = document.getElementById('p2p-recipient').value.trim();
+  document.getElementById('p2p-found').style.display    = 'none';
+  document.getElementById('p2p-notfound').style.display = 'none';
+  _p2pUser = null;
+  if (!val || val.length < 2) return;
+  _lookupTimer = setTimeout(async () => {
+    try {
+      const data = await SC.fetch('/user/lookup?q=' + encodeURIComponent(val));
+      if (data.user) {
+        _p2pUser = data.user;
+        const el = document.getElementById('p2p-found');
+        el.textContent = '✓ ' + data.user.full_name + (data.user.username ? ' (@' + data.user.username + ')' : '');
+        el.style.display = 'block';
+        document.getElementById('p2p-notfound').style.display = 'none';
+      } else {
+        _p2pUser = null;
+        document.getElementById('p2p-notfound').style.display = 'block';
+      }
+    } catch { /* no match */ 
+      _p2pUser = null;
+      document.getElementById('p2p-notfound').style.display = 'block';
+    }
+  }, 400);
+}
+
+async function sendP2P() {
+  if (!_p2pUser) { toast('Please enter a valid SwitchCash username or phone.', 'error'); return; }
+  const amount = parseFloat(document.getElementById('p2p-amount').value);
+  if (!amount || amount <= 0) { toast('Please enter a valid amount.', 'error'); return; }
+  const btn = document.getElementById('sp2p-btn');
+  btn.classList.add('ld');
+  try {
+    const data = await SC.fetch('/transactions', {
+      method: 'POST',
+      body: JSON.stringify({ receiver_id: _p2pUser.id, amount, currency: 'HTG', description: 'P2P transfer' })
+    });
+    toast(SC.fmt(amount) + ' sent to ' + _p2pUser.full_name + ' — free!', 'success');
+    document.getElementById('p2p-recipient').value = '';
+    document.getElementById('p2p-amount').value    = '';
+    document.getElementById('p2p-fee-box').style.display = 'none';
+    document.getElementById('p2p-found').style.display   = 'none';
+    _p2pUser = null;
+    loadDashboard();
+  } catch(err) {
+    toast(err.message || 'Transfer failed.', 'error');
+  }
+  btn.classList.remove('ld');
+}
 
 // ── MONCASH DEPOSIT ───────────────────────────────────────────
 function calcDeposit() {
