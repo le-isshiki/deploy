@@ -260,40 +260,23 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
           <button class="btn-send" id="s2" onclick="send(2)"><div class="spin" id="sp2"></div><span class="slbl" style="display:flex;align-items:center;gap:.45rem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send Transfer</span></button>
         </div>
         <div class="pane" id="p3">
-          <div class="fg" style="margin-bottom:.75rem">
-            <label>Wallet Type</label>
-            <select class="fi" id="dep-wallet">
-              <option value="moncash">MonCash</option>
-              <option value="natcash">NatCash</option>
-            </select>
-          </div>
-          <div class="fg" style="margin-bottom:.75rem">
-            <label>Amount (HTG)</label>
-            <input class="fi" type="number" id="dep-amount" placeholder="e.g. 5000" min="100"/>
-          </div>
-          <div class="fg" style="margin-bottom:.75rem">
-            <label>Transfer Reference (optional)</label>
-            <input class="fi" type="text" id="dep-ref" placeholder="Transaction ID from your wallet app"/>
-          </div>
-          <div class="fg" style="margin-bottom:.75rem">
-            <label>Receipt Photo</label>
-            <div id="dep-drop" onclick="document.getElementById('dep-file').click()" style="border:1.5px dashed var(--border2);border-radius:var(--r);padding:18px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.02)">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" style="margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <div style="font-size:.82rem;color:var(--muted)">Click to upload receipt screenshot</div>
-              <img id="dep-preview" style="display:none;max-width:100%;max-height:160px;margin-top:10px;border-radius:var(--r);object-fit:contain"/>
+          <div style="display:flex;flex-direction:column;gap:.75rem">
+            <div class="fg">
+              <label>Amount to deposit (HTG)</label>
+              <input class="fi" type="number" id="dep-amount" placeholder="Min. 100 HTG" min="100" oninput="calcDeposit()"/>
             </div>
-            <input type="file" id="dep-file" accept="image/*" style="display:none" onchange="depFileSelect(this)"/>
-          </div>
-          <div id="dep-note" style="font-size:.78rem;color:var(--muted);padding:.75rem;background:rgba(0,201,177,.05);border:1px solid var(--border);border-radius:var(--r);margin-bottom:.75rem;line-height:1.6">
-            Send money to our <strong style="color:var(--text)">MonCash: +509 XX XX XXXX</strong> or <strong style="color:var(--text)">NatCash: +509 XX XX XXXX</strong>, enter the amount and your transaction reference number, then submit. An admin will credit your wallet within 15 minutes. Photo is optional.
-          </div>
-          <button class="btn-send" id="s3" onclick="submitDeposit()">
-            <div class="spin" id="sp3"></div>
-            <span class="slbl" style="display:flex;align-items:center;gap:.45rem">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Submit Deposit Request
-            </span>
-          </button>
+            <div style="background:rgba(0,201,177,.05);border:1px solid rgba(0,201,177,.2);border-radius:var(--r);padding:.9rem 1rem;font-size:.82rem;color:var(--muted);line-height:1.7">
+              <strong style="color:var(--teal);display:block;margin-bottom:.3rem">&#128178; MonCash Direct — Instant &amp; Automatic</strong>
+              You will be redirected to the official MonCash payment page. Log in with your MonCash PIN to confirm. Your SwitchCash wallet will be credited <strong style="color:var(--text)">instantly</strong> — no admin needed.
+            </div>
+            <div id="dep-fee-box" style="display:none;background:rgba(255,255,255,.03);border:1px solid var(--border2);border-radius:var(--r);padding:.75rem 1rem;font-size:.83rem">
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">You pay</span><span id="dep-pay" style="font-weight:700;color:var(--white)">—</span></div>
+              <div style="display:flex;justify-content:space-between;margin-top:.3rem"><span style="color:var(--muted)">Credited to wallet</span><span id="dep-credit" style="color:var(--teal);font-weight:700">—</span></div>
+            </div>
+            <button class="btn-send" id="s3" onclick="initiateMoncashDeposit()">
+              <div class="spin" id="sp3"></div>
+              <span class="slbl">&#128178; Pay with MonCash</span>
+            </button>
         </div>
       </div>
       <div class="fee-panel">
@@ -443,6 +426,7 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
 <script src="api.js"></script>
 <script>
 SC.requireAuth();
+checkMoncashReturn();
 let histPage = 0;
 const LIMIT  = 20;
 
@@ -797,67 +781,60 @@ async function saveProfile() {
 
 loadDashboard();
 
-// ── DEPOSIT ───────────────────────────────────────────────────
-let depFileBlob = null;
-
-function depFileSelect(input) {
-  const file = input.files[0];
-  if (!file) return;
-  depFileBlob = file;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = document.getElementById('dep-preview');
-    img.src = e.target.result;
-    img.style.display = 'block';
-    document.getElementById('dep-drop').style.borderColor = 'var(--teal)';
-  };
-  reader.readAsDataURL(file);
+// ── MONCASH DEPOSIT ───────────────────────────────────────────
+function calcDeposit() {
+  const amount = parseFloat(document.getElementById('dep-amount').value) || 0;
+  const feeBox = document.getElementById('dep-fee-box');
+  if (amount >= 100) {
+    feeBox.style.display = 'block';
+    document.getElementById('dep-pay').textContent    = SC.fmt(amount);
+    document.getElementById('dep-credit').textContent = SC.fmt(amount);
+  } else {
+    feeBox.style.display = 'none';
+  }
 }
 
-async function submitDeposit() {
-  const wallet = document.getElementById('dep-wallet').value;
+async function initiateMoncashDeposit() {
   const amount = parseFloat(document.getElementById('dep-amount').value);
-  const ref    = document.getElementById('dep-ref').value.trim();
-
   if (!amount || amount < 100) { toast('Minimum deposit is 100 HTG.', 'error'); return; }
-
   const btn = document.getElementById('s3');
   btn.classList.add('ld');
-
   try {
-    const body = { wallet_type: wallet, amount, reference: ref || null };
-
-    // Attach image if selected (optional)
-    if (depFileBlob) {
-      const base64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload  = () => res(r.result.split(',')[1]);
-        r.onerror = rej;
-        r.readAsDataURL(depFileBlob);
-      });
-      body.image_base64 = base64;
-      body.image_type   = depFileBlob.type;
-      body.image_name   = depFileBlob.name;
-    }
-
-    const data = await SC.fetch('/transfers/deposit-receipt', {
+    const data = await SC.fetch('/moncash/initiate', {
       method: 'POST',
-      body: JSON.stringify(body)
+      body: JSON.stringify({ amount })
     });
-
-    toast(data.message || 'Deposit request submitted!', 'success');
-    document.getElementById('dep-amount').value = '';
-    document.getElementById('dep-ref').value    = '';
-    document.getElementById('dep-file').value   = '';
-    document.getElementById('dep-preview').style.display = 'none';
-    document.getElementById('dep-drop').style.borderColor = '';
-    depFileBlob = null;
-    switchTab(1);
+    // Redirect to MonCash payment page
+    if (data.redirect_url) {
+      window.location.href = data.redirect_url;
+    } else {
+      throw new Error('No redirect URL received');
+    }
   } catch(err) {
-    toast(err.message || 'Deposit failed. Please try again.', 'error');
+    toast(err.message || 'Could not initiate MonCash payment.', 'error');
+    btn.classList.remove('ld');
   }
-  btn.classList.remove('ld');
 }
+
+// Handle MonCash return — check URL params on page load
+function checkMoncashReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const deposit = params.get('deposit');
+  if (!deposit) return;
+  // Clean the URL
+  window.history.replaceState({}, '', window.location.pathname);
+  if (deposit === 'success') {
+    const amt = params.get('amount');
+    toast('Deposit successful! ' + (amt ? SC.fmt(parseFloat(amt)) + ' credited to your wallet.' : ''), 'success');
+    loadDashboard();
+  } else if (deposit === 'already_done') {
+    toast('This deposit was already processed.', 'info');
+  } else {
+    const reason = params.get('reason') || 'unknown';
+    toast('Deposit failed: ' + reason.replace(/_/g, ' ') + '. No money was taken.', 'error');
+  }
+}
+
 </script>
 
 <!-- Cancel transfer countdown modal -->
