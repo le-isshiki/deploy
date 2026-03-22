@@ -89,12 +89,12 @@ export default async (req) => {
     const body = await parseBody(req);
     if (!body) return errorResponse(400, 'Invalid JSON body');
 
-    const { receiver_phone, amount, currency = 'HTG', description } = body;
+    const { receiver_phone, receiver_id, amount, currency = 'HTG', description } = body;
     const amt = parseFloat(amount);
 
     if (!amt || isNaN(amt) || amt <= 0) return errorResponse(400, 'Invalid amount');
-    if (amt > MAX_NC_MC)                 return errorResponse(400, `Amount exceeds maximum of ${MAX_NC_MC.toLocaleString()} HTG`);
-    if (!receiver_phone?.trim())         return errorResponse(400, 'Receiver phone number is required');
+    if (!receiver_phone?.trim() && !receiver_id)
+      return errorResponse(400, 'Receiver phone or ID required');
 
     const [dailyRow] = await sql`
       SELECT COALESCE(SUM(amount), 0) AS total_today
@@ -105,14 +105,22 @@ export default async (req) => {
     if (parseFloat(dailyRow.total_today) + amt > DAILY_LIMIT)
       return errorResponse(400, `Daily transfer limit of ${DAILY_LIMIT.toLocaleString()} HTG reached.`);
 
-    const [receiver] = await sql`SELECT id, full_name FROM profiles WHERE phone = ${receiver_phone.trim()}`;
-    if (!receiver)              return errorResponse(404, 'No account found with that phone number');
+    // Look up receiver — by ID (P2P) or by phone
+    let receiver;
+    if (receiver_id) {
+      [receiver] = await sql`SELECT id, full_name FROM profiles WHERE id = ${receiver_id}`;
+    } else {
+      [receiver] = await sql`SELECT id, full_name FROM profiles WHERE phone = ${receiver_phone.trim()}`;
+    }
+    if (!receiver)              return errorResponse(404, 'No SwitchCash account found');
     if (receiver.id === userId) return errorResponse(400, 'You cannot send money to yourself');
 
-    const fee       = parseFloat((amt * FEE_RATE).toFixed(2));
+    // P2P (receiver_id) = zero fee; phone/external = 5% fee
+    const isP2P     = !!receiver_id;
+    const fee       = isP2P ? 0 : parseFloat((amt * FEE_RATE).toFixed(2));
     const totalCost = parseFloat((amt + fee).toFixed(2));
-    const sqlDirect = getDbDirect();
 
+    const sqlDirect = getDbDirect();
     try {
       await sqlDirect`BEGIN`;
       const [wallet] = await sqlDirect`
@@ -124,19 +132,23 @@ export default async (req) => {
       await sqlDirect`UPDATE wallets SET balance = balance - ${totalCost} WHERE id = ${wallet.id}`;
       await sqlDirect`UPDATE wallets SET balance = balance + ${amt} WHERE user_id = ${receiver.id} AND currency = ${currency}`;
       const [tx] = await sqlDirect`
-        INSERT INTO transactions (sender_id, receiver_id, wallet_id, type, amount, currency, status, description, completed_at)
-        VALUES (${userId}, ${receiver.id}, ${wallet.id}, 'send', ${amt}, ${currency}, 'completed', ${sanitize(description ?? '', 200)}, NOW())
+        INSERT INTO transactions (sender_id, receiver_id, wallet_id, type, amount, fee, currency, status, description, completed_at)
+        VALUES (${userId}, ${receiver.id}, ${wallet.id}, 'send', ${amt}, ${fee}, ${currency}, 'completed',
+                ${sanitize(description ?? (isP2P ? 'P2P transfer' : 'Transfer'), 200)}, NOW())
         RETURNING *`;
-      await sqlDirect`
-        INSERT INTO transactions (sender_id, wallet_id, type, amount, currency, status, description, completed_at)
-        VALUES (${userId}, ${wallet.id}, 'fee', ${fee}, ${currency}, 'completed', ${'Fee for ' + tx.reference}, NOW())`;
+      if (fee > 0) {
+        await sqlDirect`
+          INSERT INTO transactions (sender_id, wallet_id, type, amount, currency, status, description, completed_at)
+          VALUES (${userId}, ${wallet.id}, 'fee', ${fee}, ${currency}, 'completed', ${'Fee for ' + tx.reference}, NOW())`;
+      }
       await sqlDirect`COMMIT`;
-      return response(201, { transaction: tx });
+      return response(201, { transaction: tx, fee, is_p2p: isP2P });
     } catch {
       try { await sqlDirect`ROLLBACK`; } catch {}
       return errorResponse(500, 'Transfer failed. No money was moved. Please try again.');
     }
   }
+
 
   return errorResponse(405, 'Method not allowed');
 };
