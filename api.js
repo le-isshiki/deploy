@@ -85,6 +85,16 @@ SC.getTransactions = (opts = {}) => {
 SC.sendMoney = (receiver_phone, amount, currency = 'HTG', description = '') =>
   SC.fetch('/transactions', { method: 'POST', body: JSON.stringify({ receiver_phone, amount, currency, description }) });
 
+// ── Transfers (MonCash ↔ NatCash via agent) ───────────────────
+SC.submitTransfer = (direction, recipient_phone, amount, recipient_name = '') =>
+  SC.fetch('/transfers', { method: 'POST', body: JSON.stringify({ direction, recipient_phone, amount, recipient_name }) });
+
+SC.cancelTransfer = (transaction_id) =>
+  SC.fetch('/transfers/cancel', { method: 'POST', body: JSON.stringify({ transaction_id }) });
+
+SC.getTransferStatus = (id) =>
+  SC.fetch('/transfers/status/' + id);
+
 // ── Analytics ─────────────────────────────────────────────────
 SC.getAnalytics = () => SC.fetch('/analytics');
 
