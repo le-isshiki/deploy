@@ -276,37 +276,50 @@ export default async (req) => {
 
   // ── DEPOSITS ───────────────────────────────────────────────
   if (req.method === 'GET' && resource === 'deposits') {
-    const status = url.searchParams.get('status') ?? 'pending';
-    const deposits = status !== 'all'
-      ? await sql`SELECT dr.*, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id WHERE dr.status = ${status} ORDER BY dr.created_at DESC LIMIT 100`
-      : await sql`SELECT dr.*, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id ORDER BY dr.created_at DESC LIMIT 100`;
-    return response(200, { deposits });
+    try {
+      const status = url.searchParams.get('status') ?? 'pending';
+      // Ensure reference column exists
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS reference TEXT`;
+      const deposits = status !== 'all'
+        ? await sql`SELECT dr.id, dr.user_id, dr.wallet_type, dr.amount, dr.reference, dr.status, dr.image_url, dr.created_at, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id WHERE dr.status = ${status} ORDER BY dr.created_at DESC LIMIT 100`
+        : await sql`SELECT dr.id, dr.user_id, dr.wallet_type, dr.amount, dr.reference, dr.status, dr.image_url, dr.created_at, p.email, p.full_name, p.phone FROM deposit_receipts dr JOIN profiles p ON p.id = dr.user_id ORDER BY dr.created_at DESC LIMIT 100`;
+      return response(200, { deposits });
+    } catch(err) {
+      return errorResponse(500, 'Deposits error: ' + err.message);
+    }
   }
 
   if (req.method === 'PUT' && resource === 'deposits' && subId) {
-    const body   = await parseBody(req);
-    const status = body?.status;
-    const notes  = sanitize(body?.notes ?? '');
-    if (!['confirmed','rejected'].includes(status)) return errorResponse(400, 'Status must be confirmed or rejected');
-    const [deposit] = await sql`
-      UPDATE deposit_receipts SET status=${status}, upload_method=${notes || adminUser}
-      WHERE id=${subId} AND status='pending' RETURNING *
-    `;
-    if (!deposit) return errorResponse(404, 'Not found or already processed');
-    if (status === 'confirmed') {
-      await sql`UPDATE wallets SET balance=balance+${deposit.amount} WHERE user_id=${deposit.user_id} AND currency='HTG'`;
-      await sql`
-        INSERT INTO transactions (receiver_id, wallet_id, type, amount, currency, status, description, completed_at)
-        SELECT ${deposit.user_id}, w.id, 'deposit', ${deposit.amount}, 'HTG', 'completed',
-               ${'Deposit confirmed — ref: '+(deposit.reference||'N/A')}, NOW()
-        FROM wallets w WHERE w.user_id=${deposit.user_id} AND w.currency='HTG'
+    try {
+      const body   = await parseBody(req);
+      const status = body?.status;
+      const notes  = sanitize(body?.notes ?? '');
+      if (!['confirmed','rejected'].includes(status)) return errorResponse(400, 'Status must be confirmed or rejected');
+      const [deposit] = await sql`
+        UPDATE deposit_receipts SET status=${status}
+        WHERE id=${subId} AND status='pending' RETURNING *
       `;
-      sql`SELECT email, full_name FROM profiles WHERE id=${deposit.user_id}`.then(([p]) => {
-        if (p) sendDepositConfirmedEmail(p.email, p.full_name, deposit.amount).catch(() => {});
-      }).catch(() => {});
+      if (!deposit) return errorResponse(404, 'Not found or already processed');
+      if (status === 'confirmed') {
+        // Credit the user's HTG wallet
+        const [wallet] = await sql`SELECT id FROM wallets WHERE user_id=${deposit.user_id} AND currency='HTG' LIMIT 1`;
+        if (wallet) {
+          await sql`UPDATE wallets SET balance=balance+${deposit.amount} WHERE id=${wallet.id}`;
+          await sql`
+            INSERT INTO transactions (receiver_id, wallet_id, type, amount, currency, status, description, completed_at)
+            VALUES (${deposit.user_id}, ${wallet.id}, 'deposit', ${deposit.amount}, 'HTG', 'completed',
+                   ${'Deposit confirmed — ref: '+(deposit.reference||'N/A')}, NOW())
+          `;
+        }
+        sql`SELECT email, full_name FROM profiles WHERE id=${deposit.user_id}`.then(([p]) => {
+          if (p) sendDepositConfirmedEmail(p.email, p.full_name, deposit.amount).catch(() => {});
+        }).catch(() => {});
+      }
+      await auditLog(sql, adminUser, 'deposit_'+status, 'deposit_receipt', subId, { amount: deposit.amount, notes }, ip);
+      return response(200, { deposit });
+    } catch(err) {
+      return errorResponse(500, 'Deposit update error: ' + err.message);
     }
-    await auditLog(sql, adminUser, 'deposit_'+status, 'deposit_receipt', subId, { amount: deposit.amount, notes }, ip);
-    return response(200, { deposit });
   }
 
   // ── WITHDRAWALS ────────────────────────────────────────────
