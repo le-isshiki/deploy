@@ -26,13 +26,19 @@ async function getMoncashToken() {
     },
     body: 'scope=read,write&grant_type=client_credentials',
   });
-  if (!res.ok) throw new Error('MonCash auth failed: ' + res.status);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`MonCash auth failed: ${res.status} — ${body}`);
+  }
   const data = await res.json();
+  if (!data.access_token) throw new Error('MonCash auth: no access_token in response: ' + JSON.stringify(data));
   return data.access_token;
 }
 
 // ── Create a MonCash payment order ──────────────────────────
 async function createMoncashPayment(token, amount, orderId) {
+  // MonCash requires amount as a number, orderId as a string
+  const payload = { amount: Number(amount), orderId: String(orderId) };
   const res = await fetch(`${API_HOST}/v1/CreatePayment`, {
     method: 'POST',
     headers: {
@@ -40,9 +46,12 @@ async function createMoncashPayment(token, amount, orderId) {
       'Authorization': `Bearer ${token}`,
       'Content-Type':  'application/json',
     },
-    body: JSON.stringify({ amount, orderId }),
+    body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error('MonCash CreatePayment failed: ' + res.status);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`MonCash CreatePayment failed: ${res.status} — ${body}`);
+  }
   return res.json();
 }
 
