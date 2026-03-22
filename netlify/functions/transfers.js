@@ -38,6 +38,12 @@ export default async (req) => {
       `;
 
       await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS reference TEXT`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS wallet_type TEXT`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS amount NUMERIC(18,2)`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS image_url TEXT`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS upload_method TEXT DEFAULT 'dashboard'`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS notified_admin_at TIMESTAMPTZ`;
       const [receipt] = await sql`
         INSERT INTO deposit_receipts (user_id, image_url, wallet_type, amount, reference, upload_method)
         VALUES (
