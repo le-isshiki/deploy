@@ -289,16 +289,27 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
         <div class="pane" id="p4">
           <div style="display:flex;flex-direction:column;gap:.75rem">
             <div class="fg">
+              <label>MonCash Phone Number</label>
+              <input class="fi" type="tel" id="dep-phone" placeholder="+509 XX XX XXXX"/>
+            </div>
+            <div class="fg">
               <label>Amount to deposit (HTG)</label>
               <input class="fi" type="number" id="dep-amount" placeholder="Min. 100 HTG" min="100" oninput="calcDeposit()"/>
             </div>
             <div style="background:rgba(0,201,177,.05);border:1px solid rgba(0,201,177,.2);border-radius:var(--r);padding:.9rem 1rem;font-size:.82rem;color:var(--muted);line-height:1.7">
               <strong style="color:var(--teal);display:block;margin-bottom:.3rem">&#128178; MonCash Direct — Instant &amp; Automatic</strong>
-              You will be redirected to the official MonCash payment page. Log in with your MonCash PIN to confirm. Your SwitchCash wallet will be credited <strong style="color:var(--text)">instantly</strong> — no admin needed.
+              Entrez votre num&#233;ro MonCash et le montant. Vous recevrez une notification sur votre t&#233;l&#233;phone — approuvez avec votre PIN MonCash. Votre wallet SwitchCash sera cr&#233;dit&#233; <strong style="color:var(--text)">instantan&#233;ment</strong>.
             </div>
             <div id="dep-fee-box" style="display:none;background:rgba(255,255,255,.03);border:1px solid var(--border2);border-radius:var(--r);padding:.75rem 1rem;font-size:.83rem">
               <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">You pay</span><span id="dep-pay" style="font-weight:700;color:var(--white)">—</span></div>
               <div style="display:flex;justify-content:space-between;margin-top:.3rem"><span style="color:var(--muted)">Credited to wallet</span><span id="dep-credit" style="color:var(--teal);font-weight:700">—</span></div>
+            </div>
+            <!-- Waiting screen shown after initiation -->
+            <div id="dep-waiting" style="display:none;text-align:center;padding:1.25rem;background:rgba(0,201,177,.06);border:1px solid rgba(0,201,177,.25);border-radius:var(--r)">
+              <div style="font-size:2rem;margin-bottom:.5rem">📱</div>
+              <div style="font-weight:700;color:var(--white);margin-bottom:.3rem">Check your phone!</div>
+              <div style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">Approve the MonCash payment notification with your PIN</div>
+              <div style="font-size:.78rem;color:var(--muted)" id="dep-poll-status">Checking status...</div>
             </div>
             <button class="btn-send" id="s3" onclick="initiateMoncashDeposit()">
               <div class="spin" id="sp3"></div>
@@ -877,6 +888,9 @@ async function sendP2P() {
 }
 
 // ── MONCASH DEPOSIT ───────────────────────────────────────────
+let _depPollInterval = null;
+let _depReference    = null;
+
 function calcDeposit() {
   const amount = parseFloat(document.getElementById('dep-amount').value) || 0;
   const feeBox = document.getElementById('dep-fee-box');
@@ -891,44 +905,70 @@ function calcDeposit() {
 
 async function initiateMoncashDeposit() {
   const amount = parseFloat(document.getElementById('dep-amount').value);
+  const phone  = document.getElementById('dep-phone').value.trim();
+  if (!phone)              { toast('Please enter your MonCash phone number.', 'error'); return; }
   if (!amount || amount < 100) { toast('Minimum deposit is 100 HTG.', 'error'); return; }
+
   const btn = document.getElementById('s3');
   btn.classList.add('ld');
   try {
     const data = await SC.fetch('/moncash/initiate', {
       method: 'POST',
-      body: JSON.stringify({ amount })
+      body: JSON.stringify({ amount, phone })
     });
-    // Redirect to MonCash payment page
-    if (data.redirect_url) {
-      window.location.href = data.redirect_url;
-    } else {
-      throw new Error('No redirect URL received');
-    }
+    _depReference = data.reference;
+    // Show waiting screen
+    btn.style.display = 'none';
+    document.getElementById('dep-waiting').style.display = 'block';
+    document.getElementById('dep-fee-box').style.display = 'none';
+    // Start polling for confirmation
+    startDepositPolling();
+    toast('Check your MonCash app and approve the payment!', 'success');
   } catch(err) {
     toast(err.message || 'Could not initiate MonCash payment.', 'error');
     btn.classList.remove('ld');
   }
 }
 
-// Handle MonCash return — check URL params on page load
-function checkMoncashReturn() {
-  const params = new URLSearchParams(window.location.search);
-  const deposit = params.get('deposit');
-  if (!deposit) return;
-  // Clean the URL
-  window.history.replaceState({}, '', window.location.pathname);
-  if (deposit === 'success') {
-    const amt = params.get('amount');
-    toast('Deposit successful! ' + (amt ? SC.fmt(parseFloat(amt)) + ' credited to your wallet.' : ''), 'success');
-    loadDashboard();
-  } else if (deposit === 'already_done') {
-    toast('This deposit was already processed.', 'info');
-  } else {
-    const reason = params.get('reason') || 'unknown';
-    toast('Deposit failed: ' + reason.replace(/_/g, ' ') + '. No money was taken.', 'error');
-  }
+function startDepositPolling() {
+  let attempts = 0;
+  const maxAttempts = 24; // 2 minutes (24 x 5s)
+  clearInterval(_depPollInterval);
+  _depPollInterval = setInterval(async () => {
+    attempts++;
+    const statusEl = document.getElementById('dep-poll-status');
+    if (statusEl) statusEl.textContent = 'Checking status... (' + attempts * 5 + 's)';
+    try {
+      const data = await SC.fetch('/moncash/status?reference=' + _depReference);
+      if (data.status === 'confirmed') {
+        clearInterval(_depPollInterval);
+        toast(SC.fmt(parseFloat(data.amount)) + ' credited to your wallet!', 'success');
+        resetDepositForm();
+        loadDashboard();
+        return;
+      }
+    } catch {}
+    if (attempts >= maxAttempts) {
+      clearInterval(_depPollInterval);
+      if (statusEl) statusEl.textContent = 'Timeout — if you approved the payment, contact support.';
+    }
+  }, 5000);
 }
+
+function resetDepositForm() {
+  clearInterval(_depPollInterval);
+  _depReference = null;
+  document.getElementById('dep-phone').value  = '';
+  document.getElementById('dep-amount').value = '';
+  document.getElementById('dep-waiting').style.display  = 'none';
+  document.getElementById('dep-fee-box').style.display  = 'none';
+  const btn = document.getElementById('s3');
+  btn.style.display = '';
+  btn.classList.remove('ld');
+}
+
+// No longer needed — kept for safety
+function checkMoncashReturn() {}
 
 </script>
 
