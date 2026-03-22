@@ -98,8 +98,10 @@ export default async (req) => {
       await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS wallet_type TEXT`;
       await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS amount NUMERIC(18,2)`;
       await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT 'moncash-auto'`;
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS upload_method TEXT DEFAULT 'moncash_api'`;
+      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS upload_method TEXT DEFAULT 'dashboard'`;
       await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS notified_admin_at TIMESTAMPTZ`;
+      // Drop restrictive check constraint so moncash_api and other methods are allowed
+      await sql`ALTER TABLE deposit_receipts DROP CONSTRAINT IF EXISTS deposit_receipts_upload_method_check`;
 
       await sql`
         INSERT INTO deposit_receipts
