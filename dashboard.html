@@ -180,6 +180,24 @@ footer{padding:1.5rem 2.5rem;border-top:1px solid var(--border2);display:flex;ju
 @media(max-width:1024px){.main-grid{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr}}
 @media(max-width:768px){.stats-row{grid-template-columns:1fr 1fr}.nav-links,.btn-logout{display:none}.nav-burger{display:flex}.nav{padding:0 1.25rem}.page{padding:1.5rem 1.25rem}footer{padding:1.25rem}.frow{grid-template-columns:1fr}}
 @media(max-width:480px){.stats-row{grid-template-columns:1fr}.welcome{padding:1.25rem}.tbox,.fee-panel,.hbox{padding:1.5rem}}
+
+/* Cancel transfer overlay */
+#cancelOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center}
+#cancelOverlay.open{display:flex}
+.cancel-modal{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:2rem;width:90%;max-width:420px;text-align:center}
+.cancel-modal h3{margin:0 0 .5rem;font-size:1.15rem;color:var(--white)}
+.cancel-modal p{color:var(--muted);font-size:.85rem;margin:0 0 1.25rem}
+.cancel-modal .tx-summary{background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:10px;padding:1rem;margin-bottom:1.5rem;text-align:left;display:grid;gap:.5rem;font-size:.84rem}
+.cancel-modal .tx-summary span{color:var(--muted)}
+.cancel-modal .tx-summary strong{color:var(--white);float:right}
+.cancel-countdown{font-size:2.5rem;font-weight:800;color:var(--teal);margin-bottom:.25rem;font-variant-numeric:tabular-nums}
+.cancel-countdown.urgent{color:#f87171}
+.cancel-modal-btns{display:flex;gap:.75rem;justify-content:center;margin-top:1.25rem}
+.btn-cancel-tx{padding:.6rem 1.4rem;background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.3);border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer}
+.btn-cancel-tx:hover{background:rgba(248,113,113,.22)}
+.btn-cancel-tx:disabled{opacity:.5;cursor:not-allowed}
+.btn-keep-tx{padding:.6rem 1.4rem;background:rgba(0,201,177,.1);color:var(--teal);border:1px solid rgba(0,201,177,.25);border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer}
+.btn-keep-tx:hover{background:rgba(0,201,177,.18)}
 </style>
 </head>
 <body>
@@ -532,24 +550,83 @@ function calc(t) {
 }
 function switchTab(t) { [1,2,3].forEach(i=>{document.getElementById('t'+i).classList.toggle('on',i===t);document.getElementById('p'+i).classList.toggle('on',i===t);}); }
 
+// Cancel countdown state
+let _pendingTx = null;
+let _cancelTimer = null;
+
 async function send(t) {
-  const amt=parseFloat(document.getElementById('a'+t).value)||0, phone=document.getElementById('ph'+t).value.trim(), max=t===1?50000:75000;
+  const amt   = parseFloat(document.getElementById('a'+t).value)||0;
+  const phone = document.getElementById('ph'+t).value.trim();
+  const max   = t===1 ? 50000 : 75000;
   if (!amt||amt<=0) { toast('Please enter a valid amount.','error'); return; }
   if (amt>max)      { toast('Max transfer is '+max.toLocaleString()+' HTG.','error'); return; }
   if (!phone)       { toast('Please enter a recipient phone number.','error'); return; }
-  const btn=document.getElementById('s'+t); btn.classList.add('ld');
+  const btn = document.getElementById('s'+t);
+  btn.classList.add('ld');
   try {
-    await SC.sendMoney(phone, amt, 'HTG', t===1?'MonCash to NatCash':'NatCash to MonCash');
-    toast(SC.fmt(amt)+' sent successfully!', 'success');
-    document.getElementById('a'+t).value=''; document.getElementById('ph'+t).value=''; calc(t);
+    const direction = t===1 ? 'mc_to_nc' : 'nc_to_mc';
+    const data = await SC.submitTransfer(direction, phone, amt);
+    const tx   = data.transfer;
+    // Clear form
+    document.getElementById('a'+t).value='';
+    document.getElementById('ph'+t).value='';
+    calc(t);
     loadDashboard();
+    // Show cancel countdown
+    showCancelModal(tx);
+  } catch(err) { toast(err.message||'Transfer failed.','error'); }
+  finally { btn.classList.remove('ld'); }
+}
+
+function showCancelModal(tx) {
+  _pendingTx = tx;
+  const overlay = document.getElementById('cancelOverlay');
+  if (!overlay) return;
+  const deadline = new Date(tx.cancel_deadline);
+  document.getElementById('cancel-amount').textContent = SC.fmt(tx.amount);
+  document.getElementById('cancel-phone').textContent  = tx.recipient_phone;
+  document.getElementById('cancel-dir').textContent    = tx.direction==='mc_to_nc' ? 'MonCash → NatCash' : 'NatCash → MonCash';
+  overlay.classList.add('open');
+  clearInterval(_cancelTimer);
+  _cancelTimer = setInterval(() => {
+    const secs = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+    const el = document.getElementById('cancel-countdown');
+    if (el) el.textContent = secs + 's';
+    if (secs === 0) {
+      clearInterval(_cancelTimer);
+      closeCancelModal();
+      toast('Cancel window closed. Transfer is now being processed by an agent.', 'info');
+    }
+  }, 1000);
+}
+
+function closeCancelModal() {
+  clearInterval(_cancelTimer);
+  _pendingTx = null;
+  const overlay = document.getElementById('cancelOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+async function cancelPendingTransfer() {
+  if (!_pendingTx) return;
+  const btn = document.getElementById('cancel-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Cancelling…';
+  try {
+    await SC.cancelTransfer(_pendingTx.id);
+    toast('Transfer cancelled. Your funds have been returned.', 'success');
+    closeCancelModal();
+    loadDashboard();
+  } catch(err) {
+    toast(err.message || 'Could not cancel.', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Cancel Transfer';
+  }
+}
 
 async function retryDashboard() {
   document.getElementById('err-state').style.display = 'none';
   await loadDashboard();
-}
-  } catch(err) { toast(err.message||'Transfer failed.','error'); }
-  finally { btn.classList.remove('ld'); }
 }
 
 // ── HISTORY ───────────────────────────────────────────────────
@@ -782,5 +859,24 @@ async function submitDeposit() {
   btn.classList.remove('ld');
 }
 </script>
+
+<!-- Cancel transfer countdown modal -->
+<div id="cancelOverlay">
+  <div class="cancel-modal">
+    <div class="cancel-countdown" id="cancel-countdown">120s</div>
+    <h3>Transfer Submitted!</h3>
+    <p>You have 2 minutes to cancel before an agent picks it up.</p>
+    <div class="tx-summary">
+      <div><span>Amount</span><strong id="cancel-amount">—</strong></div>
+      <div><span>Direction</span><strong id="cancel-dir">—</strong></div>
+      <div><span>Recipient</span><strong id="cancel-phone">—</strong></div>
+    </div>
+    <div class="cancel-modal-btns">
+      <button class="btn-cancel-tx" id="cancel-confirm-btn" onclick="cancelPendingTransfer()">✕ Cancel Transfer</button>
+      <button class="btn-keep-tx" onclick="closeCancelModal()">Keep It →</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
