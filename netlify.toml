@@ -8,6 +8,11 @@
 
 # ── Block sensitive files ─────────────────────────────────────
 [[redirects]]
+  from   = "/api/moncash/*"
+  to     = "/.netlify/functions/moncash/:splat"
+  status = 200
+
+[[redirects]]
   from   = "/*.sql"
   to     = "/404.html"
   status = 404
@@ -147,18 +152,6 @@
   from   = "/agent"
   to     = "/agent.html"
   status = 200
-
-  [[redirects]]
-  from = "/api/dbfix"
-  to   = "/404.html"
-  status = 404
-  force  = true
-
-[[redirects]]
-  from = "/api/migrate"
-  to   = "/404.html"
-  status = 404
-  force  = true
 
 # ── 404 fallback ─────────────────────────────────────────────
 [[redirects]]
