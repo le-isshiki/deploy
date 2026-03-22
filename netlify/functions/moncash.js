@@ -99,17 +99,19 @@ export default async (req) => {
       // Create a unique orderId tied to this user + timestamp
       const orderId = `SC-${session.user_id.slice(0,8)}-${Date.now()}`;
 
-      // Store pending deposit in DB before redirecting
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS moncash_order_id TEXT`;
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS reference TEXT`;
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`;
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS wallet_type TEXT`;
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS amount NUMERIC(18,2)`;
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT 'moncash-auto'`;
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS upload_method TEXT DEFAULT 'dashboard'`;
-      await sql`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS notified_admin_at TIMESTAMPTZ`;
-      // Drop restrictive check constraint so moncash_api and other methods are allowed
-      await sql`ALTER TABLE deposit_receipts DROP CONSTRAINT IF EXISTS deposit_receipts_upload_method_check`;
+      // Ensure all required columns exist (use unpooled for DDL)
+      const sqlDirect = getDbDirect();
+      try {
+        await sqlDirect`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS moncash_order_id TEXT`;
+        await sqlDirect`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS reference TEXT`;
+        await sqlDirect`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`;
+        await sqlDirect`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS wallet_type TEXT`;
+        await sqlDirect`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS amount NUMERIC(18,2)`;
+        await sqlDirect`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT 'moncash-auto'`;
+        await sqlDirect`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS upload_method TEXT DEFAULT 'dashboard'`;
+        await sqlDirect`ALTER TABLE deposit_receipts ADD COLUMN IF NOT EXISTS notified_admin_at TIMESTAMPTZ`;
+        await sqlDirect`ALTER TABLE deposit_receipts DROP CONSTRAINT IF EXISTS deposit_receipts_upload_method_check`;
+      } catch { /* columns already exist — safe to ignore */ }
 
       await sql`
         INSERT INTO deposit_receipts
