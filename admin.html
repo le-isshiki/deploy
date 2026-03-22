@@ -1630,7 +1630,7 @@ async function processDeposit(action) {
   try {
     await adminFetch('deposits/' + _currentDepositId, {
       method: 'PUT',
-      body: JSON.stringify({ status: action, notes: adminUser || 'admin' })
+      body: JSON.stringify({ status: action, notes: 'admin' })
     });
     showToast(action === 'confirmed' ? 'Deposit confirmed! Wallet credited.' : 'Deposit rejected.', action === 'confirmed' ? 'success' : 'warning');
     document.getElementById('depositDetailModal').classList.remove('show');
