@@ -16,22 +16,39 @@ const SITE_URL      = process.env.URL || 'https://switchcash.net';
 
 // ── Get OAuth token from MonCash ─────────────────────────────
 async function getMoncashToken() {
-  const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
-  const res = await fetch(`${API_HOST}/oauth/token`, {
+  // Try method 1: credentials embedded in URL (as per official curl example)
+  const tokenUrl = `${API_HOST.replace('https://', `https://${CLIENT_ID}:${CLIENT_SECRET}@`)}/oauth/token`;
+  const res = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
-      'Accept':        'application/json',
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type':  'application/x-www-form-urlencoded',
+      'Accept':       'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: 'scope=read,write&grant_type=client_credentials',
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`MonCash auth failed: ${res.status} — ${body}`);
+    // Try method 2: Basic auth header as fallback
+    const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+    const res2 = await fetch(`${API_HOST}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Accept':        'application/json',
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type':  'application/x-www-form-urlencoded',
+      },
+      body: 'scope=read,write&grant_type=client_credentials',
+    });
+    if (!res2.ok) {
+      const body2 = await res2.text().catch(() => '');
+      throw new Error(`MonCash auth failed — method1: ${res.status} ${body} | method2: ${res2.status} ${body2}`);
+    }
+    const data2 = await res2.json();
+    if (!data2.access_token) throw new Error('No access_token: ' + JSON.stringify(data2));
+    return data2.access_token;
   }
   const data = await res.json();
-  if (!data.access_token) throw new Error('MonCash auth: no access_token in response: ' + JSON.stringify(data));
+  if (!data.access_token) throw new Error('No access_token: ' + JSON.stringify(data));
   return data.access_token;
 }
 
