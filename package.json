@@ -11,7 +11,8 @@
     "@neondatabase/serverless": "^0.10.4",
     "@netlify/blobs": "^8.1.0",
     "@netlify/functions": "^2.0.0",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "node-fetch": "^2.6.7"
   },
   "devDependencies": {
     "netlify-cli": "^17.0.0"
