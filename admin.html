@@ -837,6 +837,86 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
   </div><!-- /main-area -->
 </div><!-- /app -->
 
+  <!-- Add this inside <body>, probably after the preview or in a new section -->
+<section id="transfer-form-section">
+  <h2>Start Your Transfer</h2>
+  <form id="transfer-form">
+    <label for="amount">Amount to Send (HTG):</label>
+    <input type="number" id="amount" min="100" max="50000" step="1" required placeholder="e.g. 1000">
+
+    <label for="recipient-phone">Recipient NatCash Phone (+509...):</label>
+    <input type="tel" id="recipient-phone" pattern="\+509[0-9]{8}" required placeholder="+509XXXXXXXX">
+
+    <div id="fee-preview">
+      <p>Fee (5% flat): <span id="fee">0 HTG</span></p>
+      <p>Recipient Gets: <span id="recipient-gets">0 HTG</span></p>
+    </div>
+
+    <button type="submit" id="pay-button">Pay with MonCash</button>
+  </form>
+
+  <p id="status-message" style="color: red; display: none;"></p>
+</section>
+
+<script>
+// Real-time fee calculator
+const amountInput = document.getElementById('amount');
+const feeSpan = document.getElementById('fee');
+const getsSpan = document.getElementById('recipient-gets');
+const form = document.getElementById('transfer-form');
+const statusMsg = document.getElementById('status-message');
+const payButton = document.getElementById('pay-button');
+
+function updateFee() {
+  const amt = parseFloat(amountInput.value) || 0;
+  if (amt < 100) {
+    feeSpan.textContent = '0 HTG';
+    getsSpan.textContent = '0 HTG';
+    return;
+  }
+  const fee = Math.round(amt * 0.05);
+  const gets = amt - fee;
+  feeSpan.textContent = fee + ' HTG';
+  getsSpan.textContent = gets + ' HTG';
+}
+
+amountInput.addEventListener('input', updateFee);
+
+// Form submit → call Netlify function
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  payButton.disabled = true;
+  payButton.textContent = 'Processing...';
+  statusMsg.style.display = 'none';
+
+  const amount = amountInput.value;
+  const recipient = document.getElementById('recipient-phone').value;
+  const orderId = `SWC-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; // unique
+
+  try {
+    const res = await fetch('/.netlify/functions/create-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, orderId })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      throw new Error(data.error || 'Payment initiation failed');
+    }
+
+    // Redirect to MonCash gateway
+    window.location.href = data.redirectUrl;
+  } catch (err) {
+    statusMsg.textContent = err.message;
+    statusMsg.style.display = 'block';
+    payButton.disabled = false;
+    payButton.textContent = 'Pay with MonCash';
+  }
+});
+</script>
+
 <!-- ADD USER MODAL -->
 <div class="modal-bg" id="addUserModal">
   <div class="modal">
