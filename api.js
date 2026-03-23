@@ -102,4 +102,14 @@ SC.getAnalytics = () => SC.fetch('/analytics');
 SC.fmt     = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' HTG';
 SC.fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+async function initiateMonCashPayment(amount, orderId) {
+  const response = await fetch('/.netlify/functions/create-payment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount, orderId })
+  });
+  if (!response.ok) throw new Error('Network error');
+  return response.json();
+}
+
 window.SC = SC;
